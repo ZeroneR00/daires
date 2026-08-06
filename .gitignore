@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/generated/prisma
+
+# Claude/agent skills — ставятся автоматически через `prisma init`
+# (.claude, .windsurf — симлинки на .agents с абсолютным путём, ломаются при переносе)
+/.agents/
+/.claude/
+/.windsurf/
+skills-lock.json

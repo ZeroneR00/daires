@@ -10,7 +10,11 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: env("DATABASE_URL"),
-    directUrl: env("DIRECT_URL"),
+    // CLI-команды (migrate/db push/studio) должны ходить через session pooler,
+    // не через transaction pooler (DATABASE_URL) — тот не гарантирует поддержку
+    // операций уровня сессии, нужных миграциям. `directUrl` в реальном типе
+    // Datasource из @prisma/config не существует (только url/shadowDatabaseUrl),
+    // так что раньше это поле тихо игнорировалось.
+    url: env("DIRECT_URL"),
   },
 });

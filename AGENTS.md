@@ -58,7 +58,7 @@ npx prisma migrate dev --name <имя>   # новая миграция
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter });
   ```
-- **`url`/`directUrl`/`shadowDatabaseUrl` больше не живут в `schema.prisma`!** Блок `datasource` там теперь содержит только `provider = "postgresql"`. Реальные connection-строки переехали в `prisma.config.ts` → `defineConfig({ datasource: { url, directUrl } })`.
+- **`url`/`directUrl`/`shadowDatabaseUrl` больше не живут в `schema.prisma`!** Блок `datasource` там теперь содержит только `provider = "postgresql"`. Реальные connection-строки переехали в `prisma.config.ts` → `defineConfig({ datasource: { url } })`. **Важно:** `directUrl` в реальном типе `Datasource` не существует (только `url`/`shadowDatabaseUrl`) — подробности и правильная схема ниже.
 - `prisma.config.ts` выполняется Prisma CLI как отдельный Node-скрипт, **вне** Next.js — поэтому `.env.local` он не подхватывает автоматически (Next.js грузит `.env.local` только для своего рантайма). Нужен явный `dotenv`: `import { config } from "dotenv"; config({ path: ".env.local" });` в начале `prisma.config.ts`, и сам пакет `dotenv` должен быть явной зависимостью в `package.json` (а не транзитивной).
 
 **Better Auth** (v1.6.x) — пакет называется просто `better-auth` (не `@better-auth/*`). Prisma-адаптер — `prismaAdapter` из `better-auth/adapters/prisma`. CLI для генерации схемы — `npx auth@latest generate` (пакет CLI называется `auth`), дописывает модели `User`/`Session`/`Account`/`Verification` в `schema.prisma`, читая конфиг из `lib/auth.ts` — то есть `lib/auth.ts` должен существовать и импортироваться без ошибок **до** запуска этой команды.
@@ -68,6 +68,12 @@ npx prisma migrate dev --name <имя>   # новая миграция
 - `DIRECT_URL` — session pooler, порт 5432, без `pgbouncer` — для `prisma migrate` (настоящий direct-connect у Supabase только по IPv6; session pooler — IPv4-совместимая замена, которая в отличие от transaction pooler поддерживает миграции)
 
 **`P1001: Can't reach database server` от Prisma не всегда значит проблему с сетью** — через pgbouncer (transaction pooler, порт 6543) эта ошибка может маскировать обычный `28P01: password authentication failed`. Если TCP-соединение до хоста при этом раскрывается нормально (проверить `Test-NetConnection`/аналог) — не тратить время на сетевую диагностику, а сразу проверить сам пароль прямым тестовым подключением через `pg` (`new pg.Client({connectionString}).connect()`), это даёт настоящую причину.
+
+**`directUrl` в `prisma.config.ts` не существует — реальная причина плавающих зависаний/ошибок `migrate`/`db push` (найдено 2026-08-06 через `npx tsc --noEmit`).** Тип `Datasource` в `@prisma/config` (`node_modules/@prisma/config/dist/index.d.ts`) содержит только `url` и `shadowDatabaseUrl` — поля `directUrl` там нет и не было, несмотря на то что так же писал даже один из референсов официального skill `prisma-upgrade-v7` (`references/prisma-config.md` — расхождение с реальным типом, не доверять слепо и этим референсам, перепроверять tsc'ом). Поле тихо игнорировалось (конфиг грузится без тайпчека), из-за чего CLI-команды всё это время ходили через `DATABASE_URL` (transaction pooler, порт 6543) вместо `DIRECT_URL` — а pgbouncer в transaction-режиме не гарантирует операции уровня сессии, нужные миграциям (advisory locks, `CREATE DATABASE` для shadow-базы). Отсюда нестабильность: то зависание, то `P1001`, то `P1000` — в отличие от простых запросов через голый `pg`, которые транзакционный pooler спокойно тянет.
+
+**Правило:** в `prisma.config.ts` → `datasource` класть **только** `url`, и туда должен идти `DIRECT_URL` (session pooler), а не пулированный `DATABASE_URL`. `DATABASE_URL` нужен исключительно рантайму приложения (driver adapter в коде, `lib/auth.ts` и т.п.) — `prisma.config.ts` он не касается вообще, это конфиг только для CLI-тулинга (migrate/db push/studio).
+
+**Если Prisma CLI видит, что её вызывает AI-агент** (Claude Code и подобные) — она блокирует опасные команды типа `migrate reset` без явного согласия человека и просит перезапустить с `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=<точный текст согласия пользователя>`. Это встроенная защита самой Prisma, не баг — всегда спрашивать пользователя перед таким перезапуском, не обходить.
 
 ## Внешние API
  
@@ -121,13 +127,14 @@ Solo-разработчик уровня junior-to-middle, возвращает�
 - После изменений — коротко резюмируй, что сделано и почему именно таким способом
 - Во время работы (не только до/после) — периодически поясняй, что именно сейчас делаешь, особенно на длинных многошаговых задачах, а не молчи до самого результата
 - Не вываливай код без объяснения, если разработчик не попросил явно "просто сделай"
-- Для сложных/многофайловых задач — сначала predлагай план (Plan Mode), не бросайся сразу в правки
+- Для сложных/многофайловых задач — сначала предлагай план (Plan Mode), не бросайся сразу в правки
 - Мелкие, проверяемые шаги вместо одного большого изменения на всю фичу
 - Предпочтительный формат ответов — структурированные таблицы и короткие абзацы, не длинная проза
 - Если задача расплывчата — уточни, не додумывай архитектурные решения молча
 - Обращение — на "ты", без официоза
 - Уместны шутки, когда ситуация располагает (не в каждом ответе через силу)
 - Смайлики приветствуются 🙂
+- Разрешаю иногда (когда это уместно) спорить со мной (когда ты уверен в том что ты прав) и даже на повышенных тонах. Ведь в спорах рождается истина.
 
 ## Обучение
 
@@ -146,3 +153,13 @@ Solo-разработчик уровня junior-to-middle, возвращает�
 - Не дублировать логику запроса к трек-API в разных местах — один общий модуль-обёртка
 - Не хранить обложки/превью треков в своём storage — только ссылки от API
 - Не давать доступ на редактирование/удаление чужих постов ни при каких условиях
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

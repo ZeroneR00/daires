@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { searchTracksAction } from "@/app/new/actions";
+import { TrackRow } from "@/components/TrackRow";
 import type { NormalizedTrack } from "@/lib/track-api";
 
 interface TrackPickerDialogProps {
@@ -125,36 +126,9 @@ export function TrackPickerDialog({
           {results.map((track) => {
             const alreadyAdded = selectedExternalIds.has(track.externalId);
             return (
-              <div
-                key={track.externalId}
-                className="flex items-center gap-3 rounded-lg border border-black/[.08] p-2 dark:border-white/[.145]"
-              >
-                {track.artworkUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={track.artworkUrl}
-                    alt=""
-                    className="h-10 w-10 shrink-0 rounded"
-                  />
-                ) : (
-                  <div className="h-10 w-10 shrink-0 rounded bg-zinc-200 dark:bg-zinc-800" />
-                )}
+              <div key={track.externalId} className="flex items-center gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-black dark:text-zinc-50">
-                    {track.title}
-                  </p>
-                  <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                    {track.artist}
-                    {track.album ? ` — ${track.album}` : ""}
-                  </p>
-                  {track.previewUrl && (
-                    <audio
-                      controls
-                      preload="none"
-                      src={track.previewUrl}
-                      className="mt-1 h-8 w-full"
-                    />
-                  )}
+                  <TrackRow track={track} />
                 </div>
                 <button
                   type="button"

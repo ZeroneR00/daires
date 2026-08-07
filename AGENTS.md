@@ -51,11 +51,11 @@ npx prisma migrate dev --name <имя>   # новая миграция
 
 **Prisma 7** сломал привычный способ работы с клиентом по сравнению с версиями ≤6:
 - В `generator client` теперь обязателен явный `output` (например `output = "../generated/prisma"`), провайдер — `"prisma-client"` (не `"prisma-client-js"`)
-- Клиент импортируется из сгенерированной папки в проекте (`@/generated/prisma`), а **не** из `@prisma/client`
+- Клиент импортируется из сгенерированной папки в проекте (`@/generated/prisma/client` — в `generated/prisma/` нет `index.ts`, только `client.ts`/`browser.ts`), а **не** из `@prisma/client`
 - Обязателен driver adapter поверх обычного JS-драйвера (нет больше встроенного Rust-бинарника-движка). Для Postgres — `@prisma/adapter-pg` + `pg`:
   ```ts
   import { PrismaPg } from "@prisma/adapter-pg";
-  import { PrismaClient } from "@/generated/prisma";
+  import { PrismaClient } from "@/generated/prisma/client";
 
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter });

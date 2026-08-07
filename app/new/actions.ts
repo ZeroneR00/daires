@@ -37,7 +37,7 @@ const trackSchema = z.object({
 
 const createPostSchema = z.object({
   text: z.string().trim().min(1, "Текст поста не может быть пустым"),
-  tracks: z.array(trackSchema).min(1, "Добавь хотя бы один трек"),
+  tracks: z.array(trackSchema),
 });
 
 export type CreatePostInput = z.input<typeof createPostSchema>;

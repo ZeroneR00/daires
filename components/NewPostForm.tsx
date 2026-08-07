@@ -35,10 +35,6 @@ export function NewPostForm() {
       setError("Текст поста не может быть пустым");
       return;
     }
-    if (selectedTracks.length === 0) {
-      setError("Добавь хотя бы один трек");
-      return;
-    }
 
     startTransition(async () => {
       const result = await createPost({ text, tracks: selectedTracks });
@@ -112,7 +108,7 @@ export function NewPostForm() {
 
       <button
         type="submit"
-        disabled={isPending || selectedTracks.length === 0 || !text.trim()}
+        disabled={isPending || !text.trim()}
         className="mt-2 flex h-11 w-full items-center justify-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
       >
         {isPending ? "Публикуем…" : "Опубликовать"}

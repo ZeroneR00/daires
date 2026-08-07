@@ -65,7 +65,7 @@ export default function SignupPage() {
               id="username"
               type="text"
               required
-              pattern="[a-zA-Z0-9_-]+"
+              pattern="[a-zA-Z0-9_\-]+"
               title="Только латинские буквы, цифры, - и _"
               autoComplete="username"
               value={username}

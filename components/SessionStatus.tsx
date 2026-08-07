@@ -1,17 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { authClient } from "@/lib/auth-client";
 import { SignOutButton } from "./SignOutButton";
 
-export function SessionStatus() {
-  const [mounted, setMounted] = useState(false);
-  const { data, isPending } = authClient.useSession();
+function subscribeNoop() {
+  return () => {};
+}
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+function useMounted(): boolean {
+  return useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
+  );
+}
+
+export function SessionStatus() {
+  const mounted = useMounted();
+  const { data, isPending } = authClient.useSession();
 
   if (!mounted || isPending) {
     return null;

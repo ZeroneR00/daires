@@ -36,6 +36,58 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `/settings` | Профиль, аватар, bio | залогинен |
 | `/login`, `/signup` | Авторизация | публично |
  
+## Карта файлов
+
+Ниже — где что лежит, чтобы не приходилось грепать/сканировать весь проект
+ради ориентировки (актуально на 2026-08-07; если структура успела уйти
+вперёд — доверять коду, не этой таблице).
+
+**Auth**
+| Файл | Что там |
+|---|---|
+| `lib/auth.ts` | конфиг Better Auth (сервер): `prismaAdapter`, zod-валидация `username` |
+| `lib/auth-client.ts` | `authClient` для клиентских компонентов |
+| `app/api/auth/[...all]/route.ts` | catch-all route handler Better Auth |
+| `app/login/page.tsx`, `app/signup/page.tsx` | формы, зовут `authClient` напрямую (сознательное исключение из "мутации только через Server Actions" — это плюмбинг Better Auth, не бизнес-мутация) |
+
+**Layout / навигация**
+| Файл | Что там |
+|---|---|
+| `app/layout.tsx` | корневой layout, монтирует `<Header />` |
+| `components/Header.tsx` | шапка сайта |
+| `components/SessionStatus.tsx` | реактивная часть шапки (client component, `authClient.useSession()`) — не читать сессию через `auth.api.getSession()` здесь, layout не перечитывается при клиентской навигации |
+| `components/SignOutButton.tsx` | кнопка выхода |
+
+**Создание поста (`/new`)**
+| Файл | Что там |
+|---|---|
+| `app/new/page.tsx` | страница создания поста |
+| `app/new/actions.ts` | Server Actions: `searchTracksAction`, `createPost` |
+| `components/NewPostForm.tsx` | форма (текст + выбранные треки) |
+| `components/TrackPickerDialog.tsx` | модалка поиска трека (`<dialog>`, дебаунс) |
+| `lib/track-api.ts` | обёртка над iTunes/MusicBrainz, тип `NormalizedTrack` |
+| `lib/slug.ts` | генерация уникального slug поста |
+
+**Чтение данных (лента / дневник / пост)**
+| Файл | Что там |
+|---|---|
+| `lib/posts.ts` | единый query-слой: `getFeedPosts`, `getPostsByUsername`, `getPostBySlug`, `getUserByUsername` |
+| `app/page.tsx` | лента (`/`) |
+| `app/u/[username]/page.tsx` + `not-found.tsx` | дневник пользователя |
+| `app/u/[username]/[slug]/page.tsx` + `not-found.tsx` | отдельный пост |
+| `components/PostCard.tsx` | карточка поста (лента + дневник) |
+| `components/TrackRow.tsx` | строка трека (пикер, карточка, страница поста) |
+
+**Инфраструктура**
+| Файл | Что там |
+|---|---|
+| `lib/prisma.ts` | синглтон `PrismaClient` с `PrismaPg`-адаптером |
+| `lib/format-date.ts` | `formatPostDate` (`Intl.DateTimeFormat("ru")`) |
+| `prisma/schema.prisma` | схема БД |
+| `prisma.config.ts` | конфиг CLI (`DIRECT_URL`, не `DATABASE_URL` — см. ниже) |
+
+Ещё не существует: `/post/[id]/edit`, `/settings`, ownership guards — это Phase 7.
+
 ## Data model (Prisma)
  
 Ключевые модели: `User`, `Track`, `Post`, `PostTrack`, `Comment`, `Like`, `Follow`.

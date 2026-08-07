@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { getFeedPosts } from "@/lib/posts";
+import { PostCard } from "@/components/PostCard";
+
+export const dynamic = "force-dynamic";
 
 const cardClassName =
   "rounded-2xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-black";
 
 export default async function Home() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const [session, posts] = await Promise.all([
+    auth.api.getSession({ headers: await headers() }),
+    getFeedPosts(),
+  ]);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 bg-zinc-50 px-4 py-12 font-sans dark:bg-black sm:flex-row sm:px-6">
@@ -48,11 +55,19 @@ export default async function Home() {
           )}
         </div>
 
-        <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-dashed border-black/[.15] p-6 text-center dark:border-white/[.2]">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Лента постов появится здесь, когда кто-то опубликует первый трек.
-          </p>
-        </div>
+        {posts.length > 0 ? (
+          <div className="flex flex-col gap-4">
+            {posts.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-dashed border-black/[.15] p-6 text-center dark:border-white/[.2]">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Лента постов появится здесь, когда кто-то опубликует первый трек.
+            </p>
+          </div>
+        )}
       </main>
 
       <aside className="flex w-full shrink-0 flex-col gap-6 sm:w-72">

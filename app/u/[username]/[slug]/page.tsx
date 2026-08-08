@@ -25,6 +25,13 @@ export default async function PostPage({ params }: PostPageProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 bg-zinc-50 px-4 py-12 font-sans dark:bg-black">
+      <Link
+        href="/"
+        className="inline-flex w-fit items-center gap-1.5 text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+      >
+        ← На главную
+      </Link>
+
       <article className="flex flex-col gap-4 rounded-2xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-black">
         <div className="flex items-center justify-between gap-2 text-sm text-zinc-500 dark:text-zinc-400">
           <div className="flex items-center gap-2">

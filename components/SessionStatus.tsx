@@ -35,10 +35,16 @@ export function SessionStatus() {
           Добавить запись
         </Link>
         <Link
-          href={`/u/${data.user.username}`}
+          href="/settings"
           className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
         >
           {data.user.username}
+        </Link>
+        <Link
+          href={`/u/${data.user.username}`}
+          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+        >
+          Мой дневник
         </Link>
         <SignOutButton />
       </div>

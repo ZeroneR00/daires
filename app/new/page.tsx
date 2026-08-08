@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { NewPostForm } from "@/components/NewPostForm";
+import { PostForm } from "@/components/PostForm";
+import { createPost } from "@/app/new/actions";
 
 export default async function NewPostPage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -18,7 +19,7 @@ export default async function NewPostPage() {
         </p>
 
         <div className="mt-6">
-          <NewPostForm />
+          <PostForm action={createPost} submitLabel="Опубликовать" pendingLabel="Публикуем…" />
         </div>
       </div>
     </div>

@@ -1,4 +1,6 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { auth } from "@/lib/auth";
 import { getPostsByUsername, getUserByUsername } from "@/lib/posts";
 import { PostCard } from "@/components/PostCard";
 
@@ -10,7 +12,8 @@ interface UserDiaryPageProps {
 
 export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
   const { username } = await params;
-  const [user, posts] = await Promise.all([
+  const [session, user, posts] = await Promise.all([
+    auth.api.getSession({ headers: await headers() }),
     getUserByUsername(username),
     getPostsByUsername(username),
   ]);
@@ -48,7 +51,12 @@ export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
       {posts.length > 0 ? (
         <div className="flex flex-col gap-4">
           {posts.map((post) => (
-            <PostCard key={post.id} post={post} showAuthor={false} />
+            <PostCard
+              key={post.id}
+              post={post}
+              showAuthor={false}
+              currentUserId={session?.user.id}
+            />
           ))}
         </div>
       ) : (

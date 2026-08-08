@@ -6,6 +6,7 @@ import type { PostWithDetails } from "@/lib/posts";
 interface PostCardProps {
   post: PostWithDetails;
   showAuthor?: boolean;
+  currentUserId?: string | null;
 }
 
 const EXCERPT_LENGTH = 240;
@@ -15,7 +16,9 @@ function excerpt(text: string): string {
   return `${text.slice(0, EXCERPT_LENGTH).trimEnd()}…`;
 }
 
-export function PostCard({ post, showAuthor = true }: PostCardProps) {
+export function PostCard({ post, showAuthor = true, currentUserId }: PostCardProps) {
+  const isOwner = currentUserId != null && currentUserId === post.authorId;
+
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-black/[.08] p-5 dark:border-white/[.145]">
       <div className="flex items-center justify-between gap-2 text-sm text-zinc-500 dark:text-zinc-400">
@@ -27,9 +30,16 @@ export function PostCard({ post, showAuthor = true }: PostCardProps) {
             {post.author.name}
           </Link>
         )}
-        <Link href={`/u/${post.author.username}/${post.slug}`} className="hover:underline">
-          {formatPostDate(post.createdAt)}
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href={`/u/${post.author.username}/${post.slug}`} className="hover:underline">
+            {formatPostDate(post.createdAt)}
+          </Link>
+          {isOwner && (
+            <Link href={`/post/${post.id}/edit`} className="hover:underline">
+              Редактировать
+            </Link>
+          )}
+        </div>
       </div>
 
       <p className="whitespace-pre-wrap text-sm text-black dark:text-zinc-50">

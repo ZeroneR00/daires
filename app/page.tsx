@@ -58,7 +58,7 @@ export default async function Home() {
         {posts.length > 0 ? (
           <div className="flex flex-col gap-4">
             {posts.map((post) => (
-              <PostCard key={post.id} post={post} />
+              <PostCard key={post.id} post={post} currentUserId={session?.user.id} />
             ))}
           </div>
         ) : (

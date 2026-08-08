@@ -38,6 +38,13 @@ export function getPostBySlug(
   });
 }
 
+export function getPostById(id: string): Promise<PostWithDetails | null> {
+  return prisma.post.findUnique({
+    ...postWithDetails,
+    where: { id },
+  });
+}
+
 export function getUserByUsername(username: string) {
   return prisma.user.findUnique({
     where: { username },

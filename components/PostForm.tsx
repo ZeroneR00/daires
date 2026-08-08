@@ -1,21 +1,38 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createPost } from "@/app/new/actions";
 import { TrackPickerDialog } from "@/components/TrackPickerDialog";
 import type { NormalizedTrack } from "@/lib/track-api";
+import type { PostInput } from "@/lib/post-schema";
 
 const textareaClassName =
   "w-full rounded-lg border border-black/[.08] bg-white px-3 py-2 text-sm text-black outline-none transition-colors focus:border-black/30 dark:border-white/[.145] dark:bg-black dark:text-zinc-50 dark:focus:border-white/40";
 
-export function NewPostForm() {
-  const [text, setText] = useState("");
-  const [selectedTracks, setSelectedTracks] = useState<NormalizedTrack[]>([]);
+const EMPTY_FORM_ERROR = "Добавь текст или хотя бы один трек";
+
+interface PostFormProps {
+  initialText?: string;
+  initialTracks?: NormalizedTrack[];
+  action: (input: PostInput) => Promise<{ error: string } | undefined>;
+  submitLabel: string;
+  pendingLabel: string;
+}
+
+export function PostForm({
+  initialText = "",
+  initialTracks = [],
+  action,
+  submitLabel,
+  pendingLabel,
+}: PostFormProps) {
+  const [text, setText] = useState(initialText);
+  const [selectedTracks, setSelectedTracks] = useState<NormalizedTrack[]>(initialTracks);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const selectedExternalIds = new Set(selectedTracks.map((t) => t.externalId));
+  const isEmpty = !text.trim() && selectedTracks.length === 0;
 
   function handleSelectTrack(track: NormalizedTrack) {
     setSelectedTracks((prev) =>
@@ -31,13 +48,13 @@ export function NewPostForm() {
     event.preventDefault();
     setError(null);
 
-    if (!text.trim()) {
-      setError("Текст поста не может быть пустым");
+    if (isEmpty) {
+      setError(EMPTY_FORM_ERROR);
       return;
     }
 
     startTransition(async () => {
-      const result = await createPost({ text, tracks: selectedTracks });
+      const result = await action({ text, tracks: selectedTracks });
       if (result?.error) setError(result.error);
     });
   }
@@ -108,10 +125,10 @@ export function NewPostForm() {
 
       <button
         type="submit"
-        disabled={isPending || !text.trim()}
+        disabled={isPending || isEmpty}
         className="mt-2 flex h-11 w-full items-center justify-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
       >
-        {isPending ? "Публикуем…" : "Опубликовать"}
+        {isPending ? pendingLabel : submitLabel}
       </button>
 
       <TrackPickerDialog

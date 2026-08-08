@@ -70,6 +70,16 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `lib/track-api.ts` | обёртка над iTunes/MusicBrainz, тип `NormalizedTrack` |
 | `lib/slug.ts` | генерация уникального slug поста (не меняется при редактировании) |
 
+**Настройки профиля (`/settings`)**
+| Файл | Что там |
+|---|---|
+| `app/settings/page.tsx` | `auth.api.getSession()` → `redirect("/login")` если нет сессии; префилл через `getUserByUsername` (`lib/posts.ts`), рендерит `SettingsForm` |
+| `app/settings/actions.ts` | `updateProfile` Server Action — session check, zod-парсинг, `prisma.user.update({ name, bio })` напрямую (не через `authClient.updateUser()` — `bio` не зарегистрирован как Better Auth `additionalField`), без redirect, `revalidatePath` для `/` и `/u/[username]` |
+| `lib/profile-schema.ts` | `profileInputSchema`/`ProfileInput` — `name` обязателен (`max(100)`), `bio` опционален (`max(280)`, пустая строка → `null`) |
+| `components/SettingsForm.tsx` | форма по образу `PostForm`: поля `name`/`bio`, клиентская проверка непустого имени, инлайн "Сохранено" вместо редиректа |
+
+Аватар (Supabase Storage) — ещё не реализован, это Phase 7 сессия 3.
+
 **Чтение данных (лента / дневник / пост)**
 | Файл | Что там |
 |---|---|
@@ -88,7 +98,7 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `prisma/schema.prisma` | схема БД |
 | `prisma.config.ts` | конфиг CLI (`DIRECT_URL`, не `DATABASE_URL` — см. ниже) |
 
-Ещё не существует: `/settings` (имя/bio/аватар) — это Phase 7, сессии 2 и 3.
+Ещё не существует: аватар на `/settings` (Supabase Storage) — это Phase 7, сессия 3.
 
 ## Data model (Prisma)
  

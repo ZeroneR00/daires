@@ -39,7 +39,7 @@ npx prisma migrate dev --name <имя>   # новая миграция
 ## Карта файлов
 
 Ниже — где что лежит, чтобы не приходилось грепать/сканировать весь проект
-ради ориентировки (актуально на 2026-08-07; если структура успела уйти
+ради ориентировки (актуально на 2026-08-08; если структура успела уйти
 вперёд — доверять коду, не этой таблице).
 
 **Auth**
@@ -58,24 +58,26 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `components/SessionStatus.tsx` | реактивная часть шапки (client component, `authClient.useSession()`) — не читать сессию через `auth.api.getSession()` здесь, layout не перечитывается при клиентской навигации |
 | `components/SignOutButton.tsx` | кнопка выхода |
 
-**Создание поста (`/new`)**
+**Создание и редактирование поста (`/new`, `/post/[id]/edit`)**
 | Файл | Что там |
 |---|---|
-| `app/new/page.tsx` | страница создания поста |
-| `app/new/actions.ts` | Server Actions: `searchTracksAction`, `createPost` |
-| `components/NewPostForm.tsx` | форма (текст + выбранные треки) |
+| `app/new/page.tsx` + `actions.ts` | страница создания поста; `createPost` Server Action + `searchTracksAction` |
+| `app/post/[id]/edit/page.tsx` + `actions.ts` | страница редактирования; `updatePost` Server Action. Guard на владение постом — на обоих уровнях (page → `notFound()`, action → ранний `return {error}`), не полагаться только на UI |
+| `components/PostForm.tsx` | общая форма (текст + треки), используется и на `/new`, и на `/post/[id]/edit`: пропы `initialText?`, `initialTracks?`, `action`, `submitLabel`, `pendingLabel` |
 | `components/TrackPickerDialog.tsx` | модалка поиска трека (`<dialog>`, дебаунс) |
+| `lib/post-schema.ts` | общая zod-схема `postInputSchema`/`PostInput`, используется и `createPost`, и `updatePost` — правило "текст ИЛИ трек, что-то одно обязательно" |
+| `lib/post-mutations.ts` | `attachTracksToPost` — общий upsert-Track-по-`externalId` + create-`PostTrack`, вызывается внутри транзакции из обоих экшенов |
 | `lib/track-api.ts` | обёртка над iTunes/MusicBrainz, тип `NormalizedTrack` |
-| `lib/slug.ts` | генерация уникального slug поста |
+| `lib/slug.ts` | генерация уникального slug поста (не меняется при редактировании) |
 
 **Чтение данных (лента / дневник / пост)**
 | Файл | Что там |
 |---|---|
-| `lib/posts.ts` | единый query-слой: `getFeedPosts`, `getPostsByUsername`, `getPostBySlug`, `getUserByUsername` |
+| `lib/posts.ts` | единый query-слой: `getFeedPosts`, `getPostsByUsername`, `getPostBySlug`, `getPostById`, `getUserByUsername` |
 | `app/page.tsx` | лента (`/`) |
 | `app/u/[username]/page.tsx` + `not-found.tsx` | дневник пользователя |
 | `app/u/[username]/[slug]/page.tsx` + `not-found.tsx` | отдельный пост |
-| `components/PostCard.tsx` | карточка поста (лента + дневник) |
+| `components/PostCard.tsx` | карточка поста (лента + дневник); принимает `currentUserId?` — ссылка "Редактировать" видна только автору |
 | `components/TrackRow.tsx` | строка трека (пикер, карточка, страница поста) |
 
 **Инфраструктура**
@@ -86,7 +88,7 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `prisma/schema.prisma` | схема БД |
 | `prisma.config.ts` | конфиг CLI (`DIRECT_URL`, не `DATABASE_URL` — см. ниже) |
 
-Ещё не существует: `/post/[id]/edit`, `/settings`, ownership guards — это Phase 7.
+Ещё не существует: `/settings` (имя/bio/аватар) — это Phase 7, сессии 2 и 3.
 
 ## Data model (Prisma)
  

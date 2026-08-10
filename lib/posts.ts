@@ -51,3 +51,19 @@ export function getUserByUsername(username: string) {
     select: { id: true, username: true, name: true, avatarUrl: true, bio: true },
   });
 }
+
+const commentWithAuthor = {
+  include: {
+    author: { select: { id: true, username: true, name: true, avatarUrl: true } },
+  },
+} satisfies Prisma.CommentDefaultArgs;
+
+export type CommentWithAuthor = Prisma.CommentGetPayload<typeof commentWithAuthor>;
+
+export function getCommentsForPost(postId: string): Promise<CommentWithAuthor[]> {
+  return prisma.comment.findMany({
+    ...commentWithAuthor,
+    where: { postId },
+    orderBy: { createdAt: "asc" },
+  });
+}

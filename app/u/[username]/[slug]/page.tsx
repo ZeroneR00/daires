@@ -3,9 +3,12 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { formatPostDate } from "@/lib/format-date";
-import { getPostBySlug } from "@/lib/posts";
+import { getPostBySlug, getCommentsForPost } from "@/lib/posts";
 import { TrackRow } from "@/components/TrackRow";
 import { Avatar } from "@/components/Avatar";
+import { CommentForm } from "@/components/CommentForm";
+import { CommentList } from "@/components/CommentList";
+import { createComment, deleteComment } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +24,8 @@ export default async function PostPage({ params }: PostPageProps) {
   ]);
 
   if (!post) notFound();
+
+  const comments = await getCommentsForPost(post.id);
 
   const isOwner = session?.user.id === post.authorId;
 
@@ -65,6 +70,26 @@ export default async function PostPage({ params }: PostPageProps) {
           </div>
         )}
       </article>
+
+      <section className="flex flex-col gap-4 rounded-2xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-black">
+        <h2 className="text-sm font-medium text-black dark:text-zinc-50">
+          Комментарии
+        </h2>
+
+        <CommentList
+          comments={comments}
+          currentUserId={session?.user.id}
+          deleteAction={deleteComment}
+        />
+
+        {session ? (
+          <CommentForm action={createComment.bind(null, post.id)} />
+        ) : (
+          <Link href="/login" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
+            Войди, чтобы прокомментировать
+          </Link>
+        )}
+      </section>
     </div>
   );
 }

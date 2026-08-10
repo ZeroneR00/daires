@@ -46,6 +46,12 @@ export function SessionStatus() {
         >
           Мой дневник
         </Link>
+        <Link
+          href="/following"
+          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+        >
+          Моя лента
+        </Link>
         <SignOutButton />
       </div>
     );

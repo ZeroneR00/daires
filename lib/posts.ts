@@ -60,7 +60,29 @@ export async function getLikedPostIds(
 export function getUserByUsername(username: string) {
   return prisma.user.findUnique({
     where: { username },
-    select: { id: true, username: true, name: true, avatarUrl: true, bio: true },
+    select: {
+      id: true,
+      username: true,
+      name: true,
+      avatarUrl: true,
+      bio: true,
+      _count: { select: { followers: true, following: true } },
+    },
+  });
+}
+
+export function isFollowing(followerId: string, followingId: string): Promise<boolean> {
+  return prisma.follow
+    .findUnique({ where: { followerId_followingId: { followerId, followingId } } })
+    .then(Boolean);
+}
+
+export function getFollowingFeedPosts(userId: string): Promise<PostWithDetails[]> {
+  return prisma.post.findMany({
+    ...postWithDetails,
+    where: { author: { followers: { some: { followerId: userId } } } },
+    orderBy: { createdAt: "desc" },
+    take: FEED_PAGE_SIZE,
   });
 }
 

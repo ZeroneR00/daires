@@ -98,6 +98,13 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `components/CommentForm.tsx` | контролируемая textarea + `useTransition` (не `<form action>`, чтобы после успешной отправки можно было программно очистить поле) |
 | `components/CommentList.tsx` | серверный компонент, кнопка "Удалить" рендерится только когда `comment.authorId === currentUserId`; сам delete — zero-JS `<form action={deleteComment}>` на каждый комментарий |
 
+**Лайки (видны и кликабельны в трёх местах: лента, дневник, страница поста)**
+| Файл | Что там |
+|---|---|
+| `lib/like-actions.ts` | `toggleLike(postId, authorUsername, slug)` Server Action — не в `app/.../actions.ts` одного роута, т.к. вызывается из трёх разных страниц; `findUnique` по составному `postId_userId` → `create`/`delete`; `revalidatePath` для `/`, `/u/[username]` и `/u/[username]/[slug]` разом |
+| `components/LikeButton.tsx` | client component, импортирует `toggleLike` напрямую (без прокидывания action-пропом — нет единого роута-владельца); React 19 `useOptimistic` + `useTransition` для мгновенного отклика без ручного отката при ошибке |
+| `lib/posts.ts` | `_count: { select: { likes: true } }` в общем `postWithDetails` include — счётчик долетает сразу до всех read-функций; отдельный `getLikedPostIds(userId, postIds)` — batch-проверка "лайкнул ли лично я", не кешируется вместе с постом (зависит от зрителя, как и `isOwner`) |
+
 **Инфраструктура**
 | Файл | Что там |
 |---|---|

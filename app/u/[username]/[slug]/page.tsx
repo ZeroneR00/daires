@@ -3,9 +3,10 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { formatPostDate } from "@/lib/format-date";
-import { getPostBySlug, getCommentsForPost } from "@/lib/posts";
+import { getPostBySlug, getCommentsForPost, getLikedPostIds } from "@/lib/posts";
 import { TrackRow } from "@/components/TrackRow";
 import { Avatar } from "@/components/Avatar";
+import { LikeButton } from "@/components/LikeButton";
 import { CommentForm } from "@/components/CommentForm";
 import { CommentList } from "@/components/CommentList";
 import { createComment, deleteComment } from "./actions";
@@ -26,6 +27,9 @@ export default async function PostPage({ params }: PostPageProps) {
   if (!post) notFound();
 
   const comments = await getCommentsForPost(post.id);
+  const likedPostIds = session
+    ? await getLikedPostIds(session.user.id, [post.id])
+    : new Set<string>();
 
   const isOwner = session?.user.id === post.authorId;
 
@@ -50,6 +54,21 @@ export default async function PostPage({ params }: PostPageProps) {
             </Link>
             <span>·</span>
             <span>{formatPostDate(post.createdAt)}</span>
+            <span>·</span>
+            {session ? (
+              <LikeButton
+                postId={post.id}
+                authorUsername={post.author.username}
+                slug={post.slug}
+                initialLiked={likedPostIds.has(post.id)}
+                initialCount={post._count.likes}
+              />
+            ) : (
+              <Link href="/login" className="flex items-center gap-1.5 hover:underline">
+                <span aria-hidden>♡</span>
+                {post._count.likes}
+              </Link>
+            )}
           </div>
           {isOwner && (
             <Link href={`/post/${post.id}/edit`} className="hover:underline">

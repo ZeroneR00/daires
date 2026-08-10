@@ -2,12 +2,14 @@ import Link from "next/link";
 import { formatPostDate } from "@/lib/format-date";
 import { TrackRow } from "@/components/TrackRow";
 import { Avatar } from "@/components/Avatar";
+import { LikeButton } from "@/components/LikeButton";
 import type { PostWithDetails } from "@/lib/posts";
 
 interface PostCardProps {
   post: PostWithDetails;
   showAuthor?: boolean;
   currentUserId?: string | null;
+  isLiked?: boolean;
 }
 
 const EXCERPT_LENGTH = 240;
@@ -17,7 +19,12 @@ function excerpt(text: string): string {
   return `${text.slice(0, EXCERPT_LENGTH).trimEnd()}…`;
 }
 
-export function PostCard({ post, showAuthor = true, currentUserId }: PostCardProps) {
+export function PostCard({
+  post,
+  showAuthor = true,
+  currentUserId,
+  isLiked = false,
+}: PostCardProps) {
   const isOwner = currentUserId != null && currentUserId === post.authorId;
 
   return (
@@ -33,6 +40,20 @@ export function PostCard({ post, showAuthor = true, currentUserId }: PostCardPro
           </Link>
         )}
         <div className="flex items-center gap-3">
+          {currentUserId ? (
+            <LikeButton
+              postId={post.id}
+              authorUsername={post.author.username}
+              slug={post.slug}
+              initialLiked={isLiked}
+              initialCount={post._count.likes}
+            />
+          ) : (
+            <Link href="/login" className="flex items-center gap-1.5 hover:underline">
+              <span aria-hidden>♡</span>
+              {post._count.likes}
+            </Link>
+          )}
           <Link href={`/u/${post.author.username}/${post.slug}`} className="hover:underline">
             {formatPostDate(post.createdAt)}
           </Link>

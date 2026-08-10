@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getPostsByUsername, getUserByUsername } from "@/lib/posts";
+import { getPostsByUsername, getUserByUsername, getLikedPostIds } from "@/lib/posts";
 import { PostCard } from "@/components/PostCard";
 import { Avatar } from "@/components/Avatar";
 
@@ -21,6 +21,10 @@ export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
   ]);
 
   if (!user) notFound();
+
+  const likedPostIds = session
+    ? await getLikedPostIds(session.user.id, posts.map((post) => post.id))
+    : new Set<string>();
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 bg-zinc-50 px-4 py-12 font-sans dark:bg-black">
@@ -56,6 +60,7 @@ export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
               post={post}
               showAuthor={false}
               currentUserId={session?.user.id}
+              isLiked={likedPostIds.has(post.id)}
             />
           ))}
         </div>

@@ -5,6 +5,7 @@ const postWithDetails = {
   include: {
     author: { select: { id: true, username: true, name: true, avatarUrl: true } },
     tracks: { orderBy: { position: "asc" }, include: { track: true } },
+    _count: { select: { likes: true } },
   },
 } satisfies Prisma.PostDefaultArgs;
 
@@ -43,6 +44,17 @@ export function getPostById(id: string): Promise<PostWithDetails | null> {
     ...postWithDetails,
     where: { id },
   });
+}
+
+export async function getLikedPostIds(
+  userId: string,
+  postIds: string[],
+): Promise<Set<string>> {
+  const likes = await prisma.like.findMany({
+    where: { userId, postId: { in: postIds } },
+    select: { postId: true },
+  });
+  return new Set(likes.map((like) => like.postId));
 }
 
 export function getUserByUsername(username: string) {

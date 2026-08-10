@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { getFeedPosts } from "@/lib/posts";
+import { getFeedPosts, getLikedPostIds } from "@/lib/posts";
 import { PostCard } from "@/components/PostCard";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +14,9 @@ export default async function Home() {
     auth.api.getSession({ headers: await headers() }),
     getFeedPosts(),
   ]);
+  const likedPostIds = session
+    ? await getLikedPostIds(session.user.id, posts.map((post) => post.id))
+    : new Set<string>();
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 bg-zinc-50 px-4 py-12 font-sans dark:bg-black sm:flex-row sm:px-6">
@@ -58,7 +61,12 @@ export default async function Home() {
         {posts.length > 0 ? (
           <div className="flex flex-col gap-4">
             {posts.map((post) => (
-              <PostCard key={post.id} post={post} currentUserId={session?.user.id} />
+              <PostCard
+                key={post.id}
+                post={post}
+                currentUserId={session?.user.id}
+                isLiked={likedPostIds.has(post.id)}
+              />
             ))}
           </div>
         ) : (

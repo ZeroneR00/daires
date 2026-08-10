@@ -83,12 +83,20 @@ npx prisma migrate dev --name <имя>   # новая миграция
 **Чтение данных (лента / дневник / пост)**
 | Файл | Что там |
 |---|---|
-| `lib/posts.ts` | единый query-слой: `getFeedPosts`, `getPostsByUsername`, `getPostBySlug`, `getPostById`, `getUserByUsername` |
+| `lib/posts.ts` | единый query-слой: `getFeedPosts`, `getPostsByUsername`, `getPostBySlug`, `getPostById`, `getUserByUsername`, `getCommentsForPost` |
 | `app/page.tsx` | лента (`/`) |
 | `app/u/[username]/page.tsx` + `not-found.tsx` | дневник пользователя |
 | `app/u/[username]/[slug]/page.tsx` + `not-found.tsx` | отдельный пост |
 | `components/PostCard.tsx` | карточка поста (лента + дневник); принимает `currentUserId?` — ссылка "Редактировать" видна только автору |
 | `components/TrackRow.tsx` | строка трека (пикер, карточка, страница поста) |
+
+**Комментарии (только на странице поста, `/u/[username]/[slug]`)**
+| Файл | Что там |
+|---|---|
+| `lib/comment-schema.ts` | `commentInputSchema`/`CommentInput` — текст 1–1000 символов |
+| `app/u/[username]/[slug]/actions.ts` | `createComment(postId, text)` и `deleteComment(formData)` Server Actions; владение проверяется по автору *комментария*, не поста — модерация чужих комментариев автором поста не реализована (сознательно вне скоупа) |
+| `components/CommentForm.tsx` | контролируемая textarea + `useTransition` (не `<form action>`, чтобы после успешной отправки можно было программно очистить поле) |
+| `components/CommentList.tsx` | серверный компонент, кнопка "Удалить" рендерится только когда `comment.authorId === currentUserId`; сам delete — zero-JS `<form action={deleteComment}>` на каждый комментарий |
 
 **Инфраструктура**
 | Файл | Что там |

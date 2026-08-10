@@ -34,12 +34,13 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `/new` | Создание поста (поиск трека + текст) | только автор, залогинен |
 | `/post/[id]/edit` | Редактирование своего поста | только автор поста |
 | `/settings` | Профиль, аватар, bio | залогинен |
+| `/following` | Персональная лента (посты тех, на кого подписан) | залогинен |
 | `/login`, `/signup` | Авторизация | публично |
  
 ## Карта файлов
 
 Ниже — где что лежит, чтобы не приходилось грепать/сканировать весь проект
-ради ориентировки (актуально на 2026-08-08; если структура успела уйти
+ради ориентировки (актуально на 2026-08-10; если структура успела уйти
 вперёд — доверять коду, не этой таблице).
 
 **Auth**
@@ -104,6 +105,15 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `lib/like-actions.ts` | `toggleLike(postId, authorUsername, slug)` Server Action — не в `app/.../actions.ts` одного роута, т.к. вызывается из трёх разных страниц; `findUnique` по составному `postId_userId` → `create`/`delete`; `revalidatePath` для `/`, `/u/[username]` и `/u/[username]/[slug]` разом |
 | `components/LikeButton.tsx` | client component, импортирует `toggleLike` напрямую (без прокидывания action-пропом — нет единого роута-владельца); React 19 `useOptimistic` + `useTransition` для мгновенного отклика без ручного отката при ошибке |
 | `lib/posts.ts` | `_count: { select: { likes: true } }` в общем `postWithDetails` include — счётчик долетает сразу до всех read-функций; отдельный `getLikedPostIds(userId, postIds)` — batch-проверка "лайкнул ли лично я", не кешируется вместе с постом (зависит от зрителя, как и `isOwner`) |
+
+**Подписки (кнопка только на `/u/[username]`, лента на `/following`)**
+| Файл | Что там |
+|---|---|
+| `app/u/[username]/actions.ts` | `toggleFollow(targetUsername)` Server Action — в отличие от `toggleLike`, живёт в `actions.ts` конкретного роута, а не в общем `lib/`, т.к. кнопка подписки есть только на одной странице (дневник автора), не в трёх местах, как у лайка. Гард на self-follow — на уровне экшена (`targetId === session.user.id`), не только скрытием кнопки в UI; `revalidatePath` для `/u/[username]` и `/following` |
+| `components/FollowButton.tsx` | client component, `useOptimistic` + `useTransition` — та же формула дельты счётчика, что и в `LikeButton` (баг с двойным счётом, пойманный на лайках, здесь сразу учтён) |
+| `app/following/page.tsx` | персональная лента: `redirect("/login")` для анонимусов (по образцу `/new`), `getFollowingFeedPosts` + `getLikedPostIds`, отдельный текст пустого состояния (не путать с пустой глобальной лентой) |
+| `lib/posts.ts` | `_count: { select: { followers: true, following: true } }` в `getUserByUsername`; `isFollowing(followerId, followingId)` — по образцу `getLikedPostIds`, но для одной пары; `getFollowingFeedPosts(userId)` — `postWithDetails` с `where: author.followers.some.followerId = userId` |
+| `components/SessionStatus.tsx` | ссылка "Моя лента" на `/following` в залогиненном блоке |
 
 **Инфраструктура**
 | Файл | Что там |

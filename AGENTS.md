@@ -73,12 +73,12 @@ npx prisma migrate dev --name <имя>   # новая миграция
 **Настройки профиля (`/settings`)**
 | Файл | Что там |
 |---|---|
-| `app/settings/page.tsx` | `auth.api.getSession()` → `redirect("/login")` если нет сессии; префилл через `getUserByUsername` (`lib/posts.ts`), рендерит `SettingsForm` |
-| `app/settings/actions.ts` | `updateProfile` Server Action — session check, zod-парсинг, `prisma.user.update({ name, bio })` напрямую (не через `authClient.updateUser()` — `bio` не зарегистрирован как Better Auth `additionalField`), без redirect, `revalidatePath` для `/` и `/u/[username]` |
-| `lib/profile-schema.ts` | `profileInputSchema`/`ProfileInput` — `name` обязателен (`max(100)`), `bio` опционален (`max(280)`, пустая строка → `null`) |
+| `app/settings/page.tsx` | `auth.api.getSession()` → `redirect("/login")` если нет сессии; префилл через `getUserByUsername` (`lib/posts.ts`), рендерит `AvatarUploadForm` и `SettingsForm` |
+| `app/settings/actions.ts` | `updateProfile` Server Action — session check, zod-парсинг, `prisma.user.update({ name, bio })` напрямую (не через `authClient.updateUser()` — `bio` не зарегистрирован как Better Auth `additionalField`), без redirect, `revalidatePath` для `/` и `/u/[username]`. Плюс `uploadAvatar`/`removeAvatar` — тот же session-check, файл валидируется `avatarFileSchema`, путь в bucket фиксированный `avatars/<userId>` с `{ upsert: true }` (перезаписывает старый файл, без явного удаления), публичный URL кэш-бастится `?v=<timestamp>` при каждой загрузке |
+| `lib/profile-schema.ts` | `profileInputSchema`/`ProfileInput` — `name` обязателен (`max(100)`), `bio` опционален (`max(280)`, пустая строка → `null`). Плюс `avatarFileSchema`/`MAX_AVATAR_SIZE`/`ALLOWED_AVATAR_TYPES` — ≤3 МБ, только `image/jpeg`\|`image/png`\|`image/webp` (SVG сознательно исключён — может содержать `<script>`) |
 | `components/SettingsForm.tsx` | форма по образу `PostForm`: поля `name`/`bio`, клиентская проверка непустого имени, инлайн "Сохранено" вместо редиректа |
-
-Аватар (Supabase Storage) — ещё не реализован, это Phase 7 сессия 3.
+| `components/AvatarUploadForm.tsx` | client-компонент, нативный `<form action={fn}>` + `FormData` + `useActionState` (не `useTransition`, как в `SettingsForm` — `File` нельзя передать JS-объектом) для `uploadAvatar`/`removeAvatar`; локальный `avatarUrl`/`message` state обновляется внутри самих action-обёрток. `<input type="file">` спрятан (`hidden`) и триггерится стилизованным `<label htmlFor>` — нативный вид инпута не стилизуется CSS; выбор файла сам вызывает `form.requestSubmit()` в `onChange`, отдельной кнопки "Загрузить" нет (раньше была — путала: клик мимо крошечного нативного поля сразу давал "Файл не выбран") |
+| `components/Avatar.tsx` | общий презентационный компонент (`url`, `size?`) — фото или кружок-плейсхолдер; переиспользуется на `/settings`, `/u/[username]`, `PostCard`, странице поста |
 
 **Чтение данных (лента / дневник / пост)**
 | Файл | Что там |
@@ -94,11 +94,10 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | Файл | Что там |
 |---|---|
 | `lib/prisma.ts` | синглтон `PrismaClient` с `PrismaPg`-адаптером |
+| `lib/supabase.ts` | синглтон `service_role`-клиента Supabase Storage (`@supabase/supabase-js`), по образу `lib/prisma.ts`; импортируется только из Server Actions (`app/settings/actions.ts`), никогда с клиента. `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` в `.env.local`, отдельно от `DATABASE_URL`/`DIRECT_URL` — тот же Supabase-проект, но Storage API, не Postgres |
 | `lib/format-date.ts` | `formatPostDate` (`Intl.DateTimeFormat("ru")`) |
 | `prisma/schema.prisma` | схема БД |
 | `prisma.config.ts` | конфиг CLI (`DIRECT_URL`, не `DATABASE_URL` — см. ниже) |
-
-Ещё не существует: аватар на `/settings` (Supabase Storage) — это Phase 7, сессия 3.
 
 ## Data model (Prisma)
  

@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { formatPostDate } from "@/lib/format-date";
 import { getPostBySlug } from "@/lib/posts";
 import { TrackRow } from "@/components/TrackRow";
+import { Avatar } from "@/components/Avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +38,9 @@ export default async function PostPage({ params }: PostPageProps) {
           <div className="flex items-center gap-2">
             <Link
               href={`/u/${post.author.username}`}
-              className="font-medium text-black dark:text-zinc-50"
+              className="flex items-center gap-2 font-medium text-black dark:text-zinc-50"
             >
+              <Avatar url={post.author.avatarUrl} size={32} />
               {post.author.name}
             </Link>
             <span>·</span>

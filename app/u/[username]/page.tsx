@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getPostsByUsername, getUserByUsername } from "@/lib/posts";
 import { PostCard } from "@/components/PostCard";
+import { Avatar } from "@/components/Avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -31,16 +32,7 @@ export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
       </Link>
 
       <div className="flex items-center gap-4 rounded-2xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-black">
-        {user.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={user.avatarUrl}
-            alt=""
-            className="h-16 w-16 shrink-0 rounded-full"
-          />
-        ) : (
-          <div className="h-16 w-16 shrink-0 rounded-full bg-zinc-200 dark:bg-zinc-800" />
-        )}
+        <Avatar url={user.avatarUrl} size={64} />
         <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight text-black dark:text-zinc-50">
             {user.name}

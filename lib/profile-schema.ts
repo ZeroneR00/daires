@@ -10,3 +10,15 @@ export const profileInputSchema = z.object({
 });
 
 export type ProfileInput = z.input<typeof profileInputSchema>;
+
+export const MAX_AVATAR_SIZE = 3 * 1024 * 1024; // 3 МБ
+export const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+
+export const avatarFileSchema = z
+  .instanceof(File, { message: "Файл не выбран" })
+  .refine((file) => file.size > 0, "Файл не выбран")
+  .refine((file) => file.size <= MAX_AVATAR_SIZE, "Файл больше 3 МБ")
+  .refine(
+    (file) => ALLOWED_AVATAR_TYPES.includes(file.type as (typeof ALLOWED_AVATAR_TYPES)[number]),
+    "Разрешены только JPEG, PNG и WebP"
+  );

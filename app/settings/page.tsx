@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getUserByUsername } from "@/lib/posts";
 import { SettingsForm } from "@/components/SettingsForm";
+import { AvatarUploadForm } from "@/components/AvatarUploadForm";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,10 @@ export default async function SettingsPage() {
         </h1>
 
         <div className="mt-6">
+          <AvatarUploadForm initialAvatarUrl={user.avatarUrl} />
+        </div>
+
+        <div className="mt-6 border-t border-black/[.08] pt-6 dark:border-white/[.145]">
           <SettingsForm initialName={user.name} initialBio={user.bio ?? ""} />
         </div>
       </div>

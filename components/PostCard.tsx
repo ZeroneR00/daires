@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatPostDate } from "@/lib/format-date";
 import { TrackRow } from "@/components/TrackRow";
+import { Avatar } from "@/components/Avatar";
 import type { PostWithDetails } from "@/lib/posts";
 
 interface PostCardProps {
@@ -25,8 +26,9 @@ export function PostCard({ post, showAuthor = true, currentUserId }: PostCardPro
         {showAuthor && (
           <Link
             href={`/u/${post.author.username}`}
-            className="font-medium text-black dark:text-zinc-50"
+            className="flex items-center gap-2 font-medium text-black dark:text-zinc-50"
           >
+            <Avatar url={post.author.avatarUrl} size={32} />
             {post.author.name}
           </Link>
         )}

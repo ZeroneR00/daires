@@ -46,6 +46,13 @@ export function getPostById(id: string): Promise<PostWithDetails | null> {
   });
 }
 
+export function getPostsByIds(ids: string[]): Promise<PostWithDetails[]> {
+  return prisma.post.findMany({
+    ...postWithDetails,
+    where: { id: { in: ids } },
+  });
+}
+
 export async function getLikedPostIds(
   userId: string,
   postIds: string[],

@@ -8,9 +8,12 @@ import {
   getLikedPostIds,
   isFollowing,
 } from "@/lib/posts";
+import { getProfileStats } from "@/lib/stats";
+import { formatPostDate } from "@/lib/format-date";
 import { PostCard } from "@/components/PostCard";
 import { Avatar } from "@/components/Avatar";
 import { FollowButton } from "@/components/FollowButton";
+import { ProfileStats } from "@/components/ProfileStats";
 
 export const dynamic = "force-dynamic";
 
@@ -29,11 +32,12 @@ export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
   if (!user) notFound();
 
   const isOwnProfile = session?.user.id === user.id;
-  const [likedPostIds, followingTarget] = await Promise.all([
+  const [likedPostIds, followingTarget, stats] = await Promise.all([
     session
       ? getLikedPostIds(session.user.id, posts.map((post) => post.id))
       : Promise.resolve(new Set<string>()),
     session && !isOwnProfile ? isFollowing(session.user.id, user.id) : Promise.resolve(false),
+    getProfileStats(user.id),
   ]);
 
   return (
@@ -79,6 +83,8 @@ export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
             </Link>
           ))}
       </div>
+
+      <ProfileStats stats={stats} memberSince={formatPostDate(user.createdAt)} />
 
       {posts.length > 0 ? (
         <div className="flex flex-col gap-4">

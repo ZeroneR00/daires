@@ -116,6 +116,13 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `lib/posts.ts` | `_count: { select: { followers: true, following: true } }` в `getUserByUsername`; `isFollowing(followerId, followingId)` — по образцу `getLikedPostIds`, но для одной пары; `getFollowingFeedPosts(userId)` — `postWithDetails` с `where: author.followers.some.followerId = userId` |
 | `components/SessionStatus.tsx` | ссылка "Моя лента" на `/following` в залогиненном блоке |
 
+**Статистика профиля (блок на `/u/[username]`, под карточкой автора)**
+| Файл | Что там |
+|---|---|
+| `lib/stats.ts` | `getProfileStats(userId)` — постов, лайков получено, уникальных треков, топ-3 артиста. Отдельный файл, не расширение `getUserByUsername`: ту функцию зовёт ещё и `/settings`, которому статистика не нужна. Топ-артисты считаются в JS (`postTrack.findMany` + `Map`), не через Prisma `groupBy` — `groupBy` не умеет группировать по полю связанной модели (`Track.artist` при группировке `PostTrack`); для масштаба личного дневника нормально, при росте — переходить на raw SQL с `GROUP BY` (второе место с raw SQL после `lib/search.ts`) |
+| `components/ProfileStats.tsx` | серверный презентационный компонент, свой минимальный тип пропов (по образцу `UserResultRow`). Подписи в форме "Записей: N", не "N записей" — русская плюрализация существительных требует трёх ветвей согласования, а числу-счётчику это не нужно. Топ-артисты не рендерятся, если список пуст |
+| `lib/posts.ts` | `createdAt: true` добавлено в select `getUserByUsername` — только ради "Ведёт дневник с …", раньше не выбиралось |
+
 **Сквозной поиск (строка в шапке на всех страницах, результаты на `/search`)** — про сам движок и грабли см. раздел "Поиск по сайту"
 | Файл | Что там |
 |---|---|

@@ -6,6 +6,22 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { normalizePair, type FriendshipStatus } from "@/lib/friends";
 
+// Заявка между двумя людьми может лежать в базе в двух направлениях сразу:
+// если A и B нажали "Добавить в друзья" одновременно, оба прочитали пустую
+// встречную заявку и оба создали свою. Всё, что закрывает вопрос дружбы
+// (принятие с любой стороны), обязано убрать оба направления — иначе
+// оставшаяся строка становится вечной входящей заявкой от уже состоявшегося
+// друга: "Принять" по ней падает об unique на Friendship, а счётчик в шапке
+// залипает. Условие живёт здесь одной копией, как порядок пары в normalizePair.
+function pairRequests(oneId: string, otherId: string) {
+  return {
+    OR: [
+      { senderId: oneId, receiverId: otherId },
+      { senderId: otherId, receiverId: oneId },
+    ],
+  };
+}
+
 function revalidateFriendPaths(myUsername: string, targetUsername: string) {
   revalidatePath(`/u/${myUsername}`);
   revalidatePath(`/u/${targetUsername}`);
@@ -34,6 +50,21 @@ export async function sendFriendRequest(
   }
 
   const myId = session.user.id;
+  const [pairAId, pairBId] = normalizePair(myId, target.id);
+
+  // Гард на уровне экшена, а не сокрытием кнопки в UI (та же причина, что у
+  // self-follow): "use server"-функция — публичный POST-эндпоинт, и вызов при
+  // уже существующей дружбе создал бы заявку от человека, который и так друг.
+  // Такая заявка потом неубиваема через "Принять" — friendship.create бьётся
+  // об unique, — и залипает счётчиком в шапке. Возврат status, а не error:
+  // цель вызывающего достигнута, а error откатил бы useOptimistic в
+  // FriendButton к "Добавить в друзья", т.е. соврал бы сильнее.
+  const existingFriendship = await prisma.friendship.findUnique({
+    where: { userAId_userBId: { userAId: pairAId, userBId: pairBId } },
+  });
+  if (existingFriendship) {
+    return { status: "friends" };
+  }
 
   // Встречная заявка (B уже позвал A, пока A звал B) — сразу дружба,
   // без "обе заявки висят, никто не жал Принять".
@@ -44,10 +75,12 @@ export async function sendFriendRequest(
   let status: FriendshipStatus;
   try {
     if (reverseRequest) {
-      const [userAId, userBId] = normalizePair(myId, target.id);
       await prisma.$transaction([
-        prisma.friendRequest.delete({ where: { id: reverseRequest.id } }),
-        prisma.friendship.create({ data: { userAId, userBId } }),
+        // deleteMany по обоим направлениям, а не delete по id встречной: если
+        // обе строки уже есть (см. гонку в acceptFriendRequest), своя пережила
+        // бы создание дружбы и залипла фантомной заявкой.
+        prisma.friendRequest.deleteMany({ where: pairRequests(myId, target.id) }),
+        prisma.friendship.create({ data: { userAId: pairAId, userBId: pairBId } }),
       ]);
       status = "friends";
     } else {
@@ -79,8 +112,14 @@ export async function cancelFriendRequest(
   }
 
   try {
-    await prisma.friendRequest.delete({
-      where: { senderId_receiverId: { senderId: session.user.id, receiverId: target.id } },
+    // deleteMany, а не delete: ноль строк здесь — штатный исход, а не ошибка
+    // (двойной клик, или адресат успел принять/отклонить раньше). Цель
+    // вызывающего "моей заявки нет" в этом случае уже достигнута, ругаться
+    // не на что. Та же причина, что у updateMany в ignoreFriendRequest.
+    // Направление одно: отмена своей исходящей не должна заодно стирать
+    // входящую от этого же человека — это отдельное действие "Отклонить".
+    await prisma.friendRequest.deleteMany({
+      where: { senderId: session.user.id, receiverId: target.id },
     });
   } catch {
     return { error: "Не удалось отменить заявку, попробуй ещё раз" };
@@ -111,9 +150,11 @@ export async function acceptFriendRequest(
 
   try {
     await prisma.$transaction([
-      prisma.friendRequest.delete({
-        where: { senderId_receiverId: { senderId: requester.id, receiverId: myId } },
-      }),
+      // Обе стороны пары, см. pairRequests. deleteMany не кидает на нуле строк,
+      // так что от повторного принятия защищает только unique на Friendship —
+      // она и отработает, откатив транзакцию целиком. Это осознанно: нам важнее
+      // не оставить висящую заявку, чем поймать двойной клик именно здесь.
+      prisma.friendRequest.deleteMany({ where: pairRequests(requester.id, myId) }),
       prisma.friendship.create({ data: { userAId, userBId } }),
     ]);
   } catch {
@@ -141,8 +182,11 @@ export async function declineFriendRequest(
   }
 
   try {
-    await prisma.friendRequest.delete({
-      where: { senderId_receiverId: { senderId: requester.id, receiverId: session.user.id } },
+    // deleteMany по той же причине, что в cancelFriendRequest: повторный клик
+    // или уже отменённая отправителем заявка — не ошибка. Направление одно:
+    // отклоняем только входящую, свою исходящую к этому человеку не трогаем.
+    await prisma.friendRequest.deleteMany({
+      where: { senderId: requester.id, receiverId: session.user.id },
     });
   } catch {
     return { error: "Не удалось отклонить заявку, попробуй ещё раз" };

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { authClient } from "@/lib/auth-client";
+import { useFriendRequests } from "./FriendRequestsProvider";
 import { SignOutButton } from "./SignOutButton";
 
 function subscribeNoop() {
@@ -20,6 +21,8 @@ function useMounted(): boolean {
 export function SessionStatus() {
   const mounted = useMounted();
   const { data, isPending } = authClient.useSession();
+  const { notice } = useFriendRequests();
+  const requestCount = notice?.count ?? 0;
 
   if (!mounted || isPending) {
     return null;
@@ -51,6 +54,18 @@ export function SessionStatus() {
           className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
         >
           Моя лента
+        </Link>
+        <Link
+          href="/friends"
+          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+        >
+          Друзья
+          {requestCount > 0 && (
+            <span className="font-medium text-black dark:text-zinc-50">
+              {" "}
+              ({requestCount})
+            </span>
+          )}
         </Link>
         <SignOutButton />
       </div>

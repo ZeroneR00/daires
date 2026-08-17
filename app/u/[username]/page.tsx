@@ -9,10 +9,12 @@ import {
   isFollowing,
 } from "@/lib/posts";
 import { getProfileStats } from "@/lib/stats";
+import { getFriendshipStatus } from "@/lib/friends";
 import { formatPostDate } from "@/lib/format-date";
 import { PostCard } from "@/components/PostCard";
 import { Avatar } from "@/components/Avatar";
 import { FollowButton } from "@/components/FollowButton";
+import { FriendButton } from "@/components/FriendButton";
 import { ProfileStats } from "@/components/ProfileStats";
 
 export const dynamic = "force-dynamic";
@@ -32,11 +34,15 @@ export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
   if (!user) notFound();
 
   const isOwnProfile = session?.user.id === user.id;
-  const [likedPostIds, followingTarget, stats] = await Promise.all([
+  const friendCount = user._count.friendshipsA + user._count.friendshipsB;
+  const [likedPostIds, followingTarget, friendshipStatus, stats] = await Promise.all([
     session
       ? getLikedPostIds(session.user.id, posts.map((post) => post.id))
       : Promise.resolve(new Set<string>()),
     session && !isOwnProfile ? isFollowing(session.user.id, user.id) : Promise.resolve(false),
+    session && !isOwnProfile
+      ? getFriendshipStatus(session.user.id, user.id)
+      : Promise.resolve("none" as const),
     getProfileStats(user.id),
   ]);
 
@@ -59,7 +65,10 @@ export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
             @{user.username}
           </p>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {user._count.followers} подписчиков · {user._count.following} подписок
+            <Link href={`/u/${user.username}/friends`} className="hover:underline">
+              {friendCount} друзей
+            </Link>{" "}
+            · {user._count.followers} подписчиков · {user._count.following} подписок
           </p>
           {user.bio && (
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
@@ -69,11 +78,14 @@ export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
         </div>
         {!isOwnProfile &&
           (session ? (
-            <FollowButton
-              targetUsername={user.username}
-              initialFollowing={followingTarget}
-              initialFollowerCount={user._count.followers}
-            />
+            <div className="flex flex-col items-end gap-2">
+              <FollowButton
+                targetUsername={user.username}
+                initialFollowing={followingTarget}
+                initialFollowerCount={user._count.followers}
+              />
+              <FriendButton targetUsername={user.username} initialStatus={friendshipStatus} />
+            </div>
           ) : (
             <Link
               href="/login"

@@ -74,7 +74,9 @@ export function getUserByUsername(username: string) {
       avatarUrl: true,
       bio: true,
       createdAt: true,
-      _count: { select: { followers: true, following: true } },
+      _count: {
+        select: { followers: true, following: true, friendshipsA: true, friendshipsB: true },
+      },
     },
   });
 }

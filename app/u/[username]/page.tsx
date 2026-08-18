@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -21,6 +22,19 @@ export const dynamic = "force-dynamic";
 
 interface UserDiaryPageProps {
   params: Promise<{ username: string }>;
+}
+
+export async function generateMetadata({ params }: UserDiaryPageProps): Promise<Metadata> {
+  const { username } = await params;
+  const user = await getUserByUsername(username);
+  if (!user) return {};
+
+  return {
+    title: `${user.name} — music-diary`,
+    alternates: {
+      types: { "application/rss+xml": `/u/${username}/rss.xml` },
+    },
+  };
 }
 
 export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
@@ -62,7 +76,13 @@ export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
             {user.name}
           </h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            @{user.username}
+            @{user.username}{" "}
+            <Link
+              href={`/u/${user.username}/rss.xml`}
+              className="text-xs text-zinc-400 hover:underline dark:text-zinc-500"
+            >
+              RSS
+            </Link>
           </p>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
             <Link href={`/u/${user.username}/friends`} className="hover:underline">

@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "music-diary",
   description: "Платформа-блог для музыкальных дневников",
+  alternates: {
+    types: { "application/rss+xml": "/rss.xml" },
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

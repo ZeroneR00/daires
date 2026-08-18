@@ -37,6 +37,8 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `/following` | Персональная лента (посты тех, на кого подписан) | залогинен |
 | `/search` | Сквозной поиск (посты + треки + пользователи) | публично |
 | `/login`, `/signup` | Авторизация | публично |
+| `/rss.xml` | RSS-фид общей ленты | публично |
+| `/u/[username]/rss.xml` | RSS-фид дневника автора | публично |
  
 ## Карта файлов
 
@@ -156,6 +158,13 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `components/SearchBar.tsx` | `<Form action="/search">` из `next/form`, не обычный `<form>` — client-side навигация + prefetch, без JS деградирует до обычного сабмита. Серверный компонент: интерактивности нет. Кнопки нет намеренно — форма с единственным полем сабмитится по Enter сама (implicit submission); `aria-label` вместо `<label>`, т.к. плейсхолдер именем поля не считается |
 | `components/UserResultRow.tsx` | строка результата-пользователя по образцу `TrackRow`: свой минимальный интерфейс пропов вместо импорта модели Prisma. Для постов и треков переиспользуются `PostCard`/`TrackRow` как есть |
 | `components/Header.tsx` | `<SearchBar />` между логотипом и `<SessionStatus />`; логотипу добавлен `shrink-0`, контейнеру `gap-4` — иначе флекс сжимает логотип |
+
+**RSS-фиды (`/rss.xml` — общая лента, `/u/[username]/rss.xml` — дневник автора)**
+| Файл | Что там |
+|---|---|
+| `lib/rss.ts` | `renderFeed`, `escapeXml`, `deriveTitle`, `RSS_ITEM_LIMIT = 20`. Заголовки поста **генерируются на лету, не хранятся** (сознательное решение — `Post.title` не добавлялся, миграции в этой задаче нет): первая непустая строка `text`, обрезанная по границе слова (~80 симв) с `…`; если текста нет вовсе (пост «только трек» — штатный случай) — `Артист — Название` первого трека; если и трека нет — `"Запись"`. `escapeXml` экранирует `& < > " '`, порядок важен — `&` первым, иначе задвоится на уже экранированных `&lt;`/`&gt;`. Даты — `createdAt.toUTCString()` (RFC-1123), не `toISOString()` — часть читалок ISO не разберёт |
+| `app/rss.xml/route.ts`, `app/u/[username]/rss.xml/route.ts` | **первые собственные route handlers в проекте** (до этого — только catch-all Better Auth): Server Action нельзя открыть в браузере, у него нет постоянного URL и нельзя выставить `Content-Type`. `Content-Type: application/rss+xml; charset=utf-8` руками в `Response`. Origin — из `new URL(request.url).origin`, ноль конфига. Неизвестный `username` → `new Response("Not found", { status: 404 })`. `getPostsByUsername()` отдаёt все посты автора без лимита (её зовёт страница дневника) — резать до `RSS_ITEM_LIMIT` в `lib/rss.ts`, не в query-функции. **Тот же осознанный компромисс, что и у `friends`:** `app/u/[username]/rss.xml/` — статический сегмент на одном уровне с `[slug]`, пост со слагом `rss.xml` у этого автора станет недостижим |
+| `app/layout.tsx`, `app/u/[username]/page.tsx` | `alternates.types` в `metadata`/`generateMetadata` — это то, по чему читалка находит фид по голому адресу сайта (`<link rel="alternate" type="application/rss+xml">` в `<head>`). **Расхождение с доками Next, проверено `next build`:** относительный `href` (`/rss.xml`) в `alternates.types` **не даёт build error** без `metadataBase`, вопреки формулировке в `generate-metadata.md` — не заводили `metadataBase`/лишнюю env-переменную. `generateMetadata` на `/u/[username]` дергает `getUserByUsername` второй раз (страница и так его читает) — сознательно не оборачивали в React `cache()`, лишний indexed-lookup для первой версии фичи не стоит того. Плюс видимая ссылка «RSS» рядом с `@username` на дневнике |
 
 **Инфраструктура**
 | Файл | Что там |

@@ -13,27 +13,30 @@ datasource db {
 }
 
 model User {
-  id            String    @id
-  name          String
-  email         String
-  emailVerified Boolean   @default(false)
-  image         String?
-  username      String    @unique
-  bio           String?
-  avatarUrl     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  posts         Post[]
-  comments      Comment[]
-  likes         Like[]
-  following     Follow[]  @relation("Follower")
-  followers     Follow[]  @relation("Following")
+  id                     String          @id
+  name                   String
+  email                  String
+  emailVerified          Boolean         @default(false)
+  image                  String?
+  username               String          @unique
+  bio                    String?
+  avatarUrl              String?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  sessions               Session[]
+  accounts               Account[]
+  posts                  Post[]
+  comments               Comment[]
+  likes                  Like[]
+  following              Follow[]        @relation("Follower")
+  followers              Follow[]        @relation("Following")
   sentFriendRequests     FriendRequest[] @relation("SentFriendRequests")
   receivedFriendRequests FriendRequest[] @relation("ReceivedFriendRequests")
   friendshipsA           Friendship[]    @relation("FriendshipA")
   friendshipsB           Friendship[]    @relation("FriendshipB")
+  conversationsA         Conversation[]  @relation("ConversationA")
+  conversationsB         Conversation[]  @relation("ConversationB")
+  sentMessages           Message[]
 
   @@unique([email])
   @@map("user")
@@ -169,12 +172,12 @@ model Follow {
 }
 
 model FriendRequest {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   senderId   String
-  sender     User     @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  sender     User      @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
   receiverId String
-  receiver   User     @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
+  receiver   User      @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
   // Получатель нажал "Позже": заявка жива, но не считается в шапке и не
   // поднимает тост. Дата, а не boolean — оставляет возможность авто-возврата.
   ignoredAt  DateTime?
@@ -193,4 +196,39 @@ model Friendship {
 
   @@unique([userAId, userBId])
   @@map("friendship")
+}
+
+model Conversation {
+  id              String    @id @default(cuid())
+  userAId         String
+  userA           User      @relation("ConversationA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId         String
+  userB           User      @relation("ConversationB", fields: [userBId], references: [id], onDelete: Cascade)
+  // Денормализация ради сортировки списка: иначе "свежие сверху" требует
+  // подзапроса за последним сообщением каждого диалога.
+  lastMessageAt   DateTime  @default(now())
+  // "Прочитано" — метка на диалоге, а не флаг на каждом сообщении: открытие
+  // чата с 200 сообщениями это один update, а не 200. null — ни разу не открывал.
+  userALastReadAt DateTime?
+  userBLastReadAt DateTime?
+  createdAt       DateTime  @default(now())
+  messages        Message[]
+
+  @@unique([userAId, userBId])
+  @@index([userAId, lastMessageAt])
+  @@index([userBId, lastMessageAt])
+  @@map("conversation")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  text           String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("message")
 }

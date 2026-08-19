@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Header } from "@/components/Header";
 import { FriendRequestToast } from "@/components/FriendRequestToast";
-import { FriendRequestsProvider } from "@/components/FriendRequestsProvider";
+import { NotificationsProvider } from "@/components/NotificationsProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,11 +30,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <FriendRequestsProvider>
+        <NotificationsProvider>
           <Header />
           {children}
           <FriendRequestToast />
-        </FriendRequestsProvider>
+        </NotificationsProvider>
       </body>
     </html>
   );

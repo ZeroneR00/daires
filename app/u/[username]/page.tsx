@@ -105,6 +105,17 @@ export default async function UserDiaryPage({ params }: UserDiaryPageProps) {
                 initialFollowerCount={user._count.followers}
               />
               <FriendButton targetUsername={user.username} initialStatus={friendshipStatus} />
+              {/* Кнопка появляется только у друзей — это же условие
+                  продублировано гардом внутри sendMessage: "use server" —
+                  публичный эндпоинт, на сокрытие в UI полагаться нельзя. */}
+              {friendshipStatus === "friends" && (
+                <Link
+                  href={`/messages/${user.username}`}
+                  className="flex h-9 items-center rounded-full border border-black/[.08] px-4 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+                >
+                  Написать
+                </Link>
+              )}
             </div>
           ) : (
             <Link

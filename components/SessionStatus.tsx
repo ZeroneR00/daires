@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { authClient } from "@/lib/auth-client";
-import { useFriendRequests } from "./FriendRequestsProvider";
+import { useNotifications } from "./NotificationsProvider";
 import { SignOutButton } from "./SignOutButton";
 
 function subscribeNoop() {
@@ -21,8 +21,8 @@ function useMounted(): boolean {
 export function SessionStatus() {
   const mounted = useMounted();
   const { data, isPending } = authClient.useSession();
-  const { notice } = useFriendRequests();
-  const requestCount = notice?.count ?? 0;
+  const { friendRequests, unreadMessages } = useNotifications();
+  const requestCount = friendRequests?.count ?? 0;
 
   if (!mounted || isPending) {
     return null;
@@ -64,6 +64,18 @@ export function SessionStatus() {
             <span className="font-medium text-black dark:text-zinc-50">
               {" "}
               ({requestCount})
+            </span>
+          )}
+        </Link>
+        <Link
+          href="/messages"
+          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+        >
+          Сообщения
+          {unreadMessages > 0 && (
+            <span className="font-medium text-black dark:text-zinc-50">
+              {" "}
+              ({unreadMessages})
             </span>
           )}
         </Link>

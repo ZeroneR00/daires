@@ -8,7 +8,7 @@ import {
   declineFriendRequest,
   ignoreFriendRequest,
 } from "@/lib/friend-actions";
-import { useFriendRequests } from "@/components/FriendRequestsProvider";
+import { useNotifications } from "@/components/NotificationsProvider";
 
 interface IncomingRequestRowProps {
   requester: { username: string; name: string; avatarUrl: string | null };
@@ -22,7 +22,7 @@ const buttonClass =
 
 export function IncomingRequestRow({ requester, deferred = false }: IncomingRequestRowProps) {
   const [isPending, startTransition] = useTransition();
-  const { refresh } = useFriendRequests();
+  const { refresh } = useNotifications();
 
   // revalidatePath внутри экшена перерисует серверную страницу, но не клиентскую
   // шапку — цифру рядом с "Друзья" обновляем сами, после того как экшен ответил.

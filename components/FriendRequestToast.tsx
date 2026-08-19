@@ -2,17 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useFriendRequests } from "@/components/FriendRequestsProvider";
+import { useNotifications } from "@/components/NotificationsProvider";
 import type { FriendRequestNotice } from "@/lib/notifications";
 
 const AUTO_HIDE_MS = 12_000;
 
-// Чисто презентационный: когда напомнить — решает FriendRequestsProvider, тут
+// Чисто презентационный: когда напомнить — решает NotificationsProvider, тут
 // остаётся показать очередное напоминание и дать его закрыть. "Закрыт" хранится
 // как сам объект напоминания, а не boolean: следующее напоминание — новый
 // объект, оно не окажется закрытым по инерции.
 export function FriendRequestToast() {
-  const { announcement } = useFriendRequests();
+  const { announcement } = useNotifications();
   const [dismissed, setDismissed] = useState<FriendRequestNotice | null>(null);
   const visible = announcement !== null && announcement !== dismissed;
 

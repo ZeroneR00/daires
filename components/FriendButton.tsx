@@ -9,7 +9,7 @@ import {
   removeFriend,
 } from "@/lib/friend-actions";
 import type { FriendshipStatus } from "@/lib/friends";
-import { useFriendRequests } from "@/components/FriendRequestsProvider";
+import { useNotifications } from "@/components/NotificationsProvider";
 
 interface FriendButtonProps {
   targetUsername: string;
@@ -21,7 +21,7 @@ const buttonClass =
 
 export function FriendButton({ targetUsername, initialStatus }: FriendButtonProps) {
   const [isPending, startTransition] = useTransition();
-  const { refresh } = useFriendRequests();
+  const { refresh } = useNotifications();
   const [status, setStatus] = useOptimistic(
     initialStatus,
     (_state, next: FriendshipStatus) => next,

@@ -12,31 +12,37 @@ import {
   type ReactNode,
 } from "react";
 import { authClient } from "@/lib/auth-client";
-import {
-  getFriendRequestNotice,
-  type FriendRequestNotice,
-} from "@/lib/notifications";
+import { getNotices, type FriendRequestNotice } from "@/lib/notifications";
+import { getBrowserSupabase } from "@/lib/supabase-browser";
+import { PING_EVENT, userChannelTopic } from "@/lib/realtime-channel";
 
 const ANNOUNCE_INTERVAL_MS = 60 * 60 * 1000;
 
-interface FriendRequestsValue {
-  // Для счётчика в шапке: сколько заявок висит прямо сейчас.
-  notice: FriendRequestNotice | null;
-  // Для тоста: то же самое, но выставляется только когда пора напомнить.
+interface NotificationsValue {
+  // Для счётчика заявок в шапке: сколько заявок висит прямо сейчас.
+  friendRequests: FriendRequestNotice | null;
+  // Для счётчика сообщений в шапке.
+  unreadMessages: number;
+  // Для тоста: те же заявки, но выставляется только когда пора напомнить.
   announcement: FriendRequestNotice | null;
+  // Момент последнего Realtime-пинга. Страница диалога вешает на него эффект и
+  // перезапрашивает себя — сам пинг пустой, содержимое приезжает обычным путём.
+  lastPingAt: number;
   refresh: () => void;
 }
 
 // Дефолт нужен, чтобы хук не падал вне провайдера (например, если компонент
-// когда-нибудь отрендерят в изоляции) — молча отдаём "заявок нет".
-const FriendRequestsContext = createContext<FriendRequestsValue>({
-  notice: null,
+// когда-нибудь отрендерят в изоляции) — молча отдаём "уведомлений нет".
+const NotificationsContext = createContext<NotificationsValue>({
+  friendRequests: null,
+  unreadMessages: 0,
   announcement: null,
+  lastPingAt: 0,
   refresh: () => {},
 });
 
-export function useFriendRequests(): FriendRequestsValue {
-  return useContext(FriendRequestsContext);
+export function useNotifications(): NotificationsValue {
+  return useContext(NotificationsContext);
 }
 
 // Ключ с userId внутри: два аккаунта в одном браузере не должны глушить
@@ -75,6 +81,9 @@ function readStamp(key: string): ToastStamp {
 // Сравнение по дате, а не по id: если заявок две и свежую отложили кнопкой
 // "Позже", самой свежей становится старая — её дата меньше сохранённой, и тост
 // не выстреливает повторно сразу после нажатия.
+//
+// Политика осталась ровно про заявки: тост про сообщения не показываем — они и
+// так видны цифрой в шапке, а всплывашка на каждое сообщение мешала бы.
 function shouldAnnounce(userId: string, notice: FriendRequestNotice): boolean {
   const key = storageKey(userId);
   const { shownAt, lastCreatedAt } = readStamp(key);
@@ -90,20 +99,23 @@ function shouldAnnounce(userId: string, notice: FriendRequestNotice): boolean {
   return true;
 }
 
-// Единственный владелец счётчика заявок на клиенте. Держать его здесь, а не в
-// SessionStatus, обязательно: revalidatePath из экшена перерисовывает только
-// серверные страницы, до клиентской шапки в layout'е он не дотягивается, и
-// цифра после "Принять" замерла бы до полной перезагрузки.
+// Единственный владелец клиентских уведомлений (заявки в друзья + непрочитанные
+// сообщения). Держать их здесь, а не в SessionStatus, обязательно:
+// revalidatePath из экшена перерисовывает только серверные страницы, до
+// клиентской шапки в layout'е он не дотягивается, и цифра после "Принять"
+// замерла бы до полной перезагрузки.
 //
 // Политика показа тоста живёт тоже здесь, а не в самом тосте: решение зависит
 // от момента, когда пришли свежие данные, и принимать его в колбэке запроса
 // правильнее, чем в эффекте, реагирующем на уже разложенный по state результат.
-export function FriendRequestsProvider({ children }: { children: ReactNode }) {
+export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { data } = authClient.useSession();
   const userId = data?.user.id;
   const pathname = usePathname();
-  const [notice, setNotice] = useState<FriendRequestNotice | null>(null);
+  const [friendRequests, setFriendRequests] = useState<FriendRequestNotice | null>(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [announcement, setAnnouncement] = useState<FriendRequestNotice | null>(null);
+  const [lastPingAt, setLastPingAt] = useState(0);
   const latestRequest = useRef(0);
 
   const refresh = useCallback(() => {
@@ -117,18 +129,19 @@ export function FriendRequestsProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    getFriendRequestNotice()
+    getNotices()
       .then((result) => {
         if (id !== latestRequest.current) {
           return;
         }
 
-        setNotice(result);
+        setFriendRequests(result.friendRequests);
+        setUnreadMessages(result.unreadMessages);
 
-        if (!result) {
+        if (!result.friendRequests) {
           setAnnouncement(null);
-        } else if (shouldAnnounce(userId, result)) {
-          setAnnouncement(result);
+        } else if (shouldAnnounce(userId, result.friendRequests)) {
+          setAnnouncement(result.friendRequests);
         }
       })
       // Напоминалка — вещь второстепенная: упавший запрос оставляет прошлое
@@ -142,8 +155,9 @@ export function FriendRequestsProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh, pathname]);
 
-  // Возврат на вкладку: без поллинга это второй (и последний) способ заметить
-  // заявку, пришедшую пока вкладка висела открытой.
+  // Возврат на вкладку: без поллинга это способ заметить заявку, пришедшую пока
+  // вкладка висела открытой (у сообщений для этого есть Realtime-пинг ниже, у
+  // заявок — нет, они шлются без него).
   useEffect(() => {
     function handleVisibility() {
       if (document.visibilityState === "visible") {
@@ -155,20 +169,52 @@ export function FriendRequestsProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [refresh]);
 
-  // Маскируем по userId: после выхода из аккаунта цифра исчезает сразу, не
+  // Realtime-"звонок". Канал публичный и пустой: в payload нет ни текста, ни
+  // отправителя — приватные каналы авторизуются Supabase-JWT, которого у нас
+  // нет (сессия в Better Auth). Пинг лишь говорит "сходи перечитай", а
+  // содержимое приезжает обычным Server Action'ом с сессионной кукой.
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    const client = getBrowserSupabase();
+    if (!client) {
+      // Ключи не настроены — живой доставки просто нет, всё остальное работает.
+      return;
+    }
+
+    const channel = client
+      .channel(userChannelTopic(userId))
+      .on("broadcast", { event: PING_EVENT }, () => {
+        // Два независимых потребителя: цифра в шапке (refresh) и открытая
+        // страница диалога (lastPingAt в контексте).
+        setLastPingAt(Date.now());
+        refresh();
+      })
+      .subscribe();
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [userId, refresh]);
+
+  // Маскируем по userId: после выхода из аккаунта цифры исчезают сразу, не
   // дожидаясь ответа (которого и не будет — запрос для анонимуса не уходит).
   const value = useMemo(
     () => ({
-      notice: userId ? notice : null,
+      friendRequests: userId ? friendRequests : null,
+      unreadMessages: userId ? unreadMessages : 0,
       announcement: userId ? announcement : null,
+      lastPingAt,
       refresh,
     }),
-    [userId, notice, announcement, refresh],
+    [userId, friendRequests, unreadMessages, announcement, lastPingAt, refresh],
   );
 
   return (
-    <FriendRequestsContext.Provider value={value}>
+    <NotificationsContext.Provider value={value}>
       {children}
-    </FriendRequestsContext.Provider>
+    </NotificationsContext.Provider>
   );
 }

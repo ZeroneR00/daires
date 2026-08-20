@@ -38,12 +38,6 @@ export function SessionStatus() {
           Добавить запись
         </Link>
         <Link
-          href="/settings"
-          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
-        >
-          {data.user.username}
-        </Link>
-        <Link
           href={`/u/${data.user.username}`}
           className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
         >
@@ -79,7 +73,21 @@ export function SessionStatus() {
             </span>
           )}
         </Link>
-        <SignOutButton />
+
+        <div className="flex h-9 shrink-0 items-center gap-2 rounded-full border border-black/[.08] pl-3 pr-1 dark:border-white/[.145]">
+          <Link
+            href="/settings"
+            title="Настройки профиля"
+            className="max-w-[9rem] truncate text-sm font-medium text-black hover:underline dark:text-zinc-50"
+          >
+            {data.user.username}
+          </Link>
+          <span
+            aria-hidden
+            className="h-4 w-px shrink-0 bg-black/[.08] dark:bg-white/[.145]"
+          />
+          <SignOutButton />
+        </div>
       </div>
     );
   }

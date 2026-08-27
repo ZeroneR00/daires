@@ -18,6 +18,9 @@ function useMounted(): boolean {
   );
 }
 
+const navLinkClassName =
+  "text-sm text-muted transition-colors hover:text-accent";
+
 export function SessionStatus() {
   const mounted = useMounted();
   const { data, isPending } = authClient.useSession();
@@ -33,59 +36,34 @@ export function SessionStatus() {
       <div className="flex items-center gap-4">
         <Link
           href="/new"
-          className="flex h-9 items-center rounded-full border border-black/[.08] px-4 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+          className="flex h-9 shrink-0 items-center rounded-full bg-accent px-4 text-sm font-medium text-accent-ink transition-opacity hover:opacity-90"
         >
           Добавить запись
         </Link>
-        <Link
-          href={`/u/${data.user.username}`}
-          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
-        >
+        <Link href={`/u/${data.user.username}`} className={navLinkClassName}>
           Мой дневник
         </Link>
-        <Link
-          href="/following"
-          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
-        >
+        <Link href="/following" className={navLinkClassName}>
           Моя лента
         </Link>
-        <Link
-          href="/friends"
-          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
-        >
+        <Link href="/friends" className={navLinkClassName}>
           Друзья
-          {requestCount > 0 && (
-            <span className="font-medium text-black dark:text-zinc-50">
-              {" "}
-              ({requestCount})
-            </span>
-          )}
+          {requestCount > 0 && <Badge>{requestCount}</Badge>}
         </Link>
-        <Link
-          href="/messages"
-          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
-        >
+        <Link href="/messages" className={navLinkClassName}>
           Сообщения
-          {unreadMessages > 0 && (
-            <span className="font-medium text-black dark:text-zinc-50">
-              {" "}
-              ({unreadMessages})
-            </span>
-          )}
+          {unreadMessages > 0 && <Badge>{unreadMessages}</Badge>}
         </Link>
 
-        <div className="flex h-9 shrink-0 items-center gap-2 rounded-full border border-black/[.08] pl-3 pr-1 dark:border-white/[.145]">
+        <div className="flex h-9 shrink-0 items-center gap-2 rounded-full border border-line pl-3 pr-1">
           <Link
             href="/settings"
             title="Настройки профиля"
-            className="max-w-[9rem] truncate text-sm font-medium text-black hover:underline dark:text-zinc-50"
+            className="max-w-[9rem] truncate text-sm font-medium text-ink hover:text-accent"
           >
             {data.user.username}
           </Link>
-          <span
-            aria-hidden
-            className="h-4 w-px shrink-0 bg-black/[.08] dark:bg-white/[.145]"
-          />
+          <span aria-hidden className="h-4 w-px shrink-0 bg-line" />
           <SignOutButton />
         </div>
       </div>
@@ -94,15 +72,25 @@ export function SessionStatus() {
 
   return (
     <div className="flex items-center gap-3 text-sm font-medium">
-      <Link href="/login" className="text-black dark:text-zinc-50">
+      <Link href="/login" className="text-ink transition-colors hover:text-accent">
         Войти
       </Link>
       <Link
         href="/signup"
-        className="flex h-9 items-center rounded-full bg-foreground px-4 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+        className="flex h-9 items-center rounded-full bg-accent px-4 text-accent-ink transition-opacity hover:opacity-90"
       >
         Регистрация
       </Link>
     </div>
+  );
+}
+
+// Счётчик непрочитанного: раньше это была просто цифра в скобках, теперь
+// акцентная точка-плашка — её видно боковым зрением, ради чего счётчик и нужен.
+function Badge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold text-accent-ink">
+      {children}
+    </span>
   );
 }

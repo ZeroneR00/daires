@@ -1,3 +1,5 @@
+import { artworkAtSize } from "@/lib/artwork";
+
 interface TrackRowTrack {
   title: string;
   artist: string;
@@ -12,19 +14,23 @@ interface TrackRowProps {
 }
 
 export function TrackRow({ track, showPreview = true }: TrackRowProps) {
+  const artwork = artworkAtSize(track.artworkUrl, 200);
+
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-black/[.08] p-2 dark:border-white/[.145]">
-      {track.artworkUrl ? (
+    <div className="flex items-center gap-3 rounded-xl border border-line bg-paper p-2.5">
+      {artwork ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={track.artworkUrl} alt="" className="h-10 w-10 shrink-0 rounded" />
+        <img
+          src={artwork}
+          alt=""
+          className="h-11 w-11 shrink-0 rounded-lg object-cover ring-1 ring-line"
+        />
       ) : (
-        <div className="h-10 w-10 shrink-0 rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="h-11 w-11 shrink-0 rounded-lg bg-accent-wash ring-1 ring-line" />
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-black dark:text-zinc-50">
-          {track.title}
-        </p>
-        <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="truncate text-sm font-medium text-ink">{track.title}</p>
+        <p className="truncate text-xs text-muted">
           {track.artist}
           {track.album ? ` — ${track.album}` : ""}
         </p>
@@ -33,7 +39,7 @@ export function TrackRow({ track, showPreview = true }: TrackRowProps) {
             controls
             preload="none"
             src={track.previewUrl}
-            className="mt-1 h-8 w-full"
+            className="mt-2 h-8 w-full"
           />
         )}
       </div>

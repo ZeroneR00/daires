@@ -40,9 +40,13 @@ export function LikeButton({
       type="button"
       onClick={handleClick}
       disabled={isPending}
-      className="flex items-center gap-1.5 text-sm text-zinc-500 transition-colors hover:text-black disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-50"
+      className={`flex items-center gap-1.5 text-sm transition-colors disabled:opacity-60 ${
+        optimistic.liked ? "text-accent" : "text-muted hover:text-accent"
+      }`}
     >
-      <span aria-hidden>{optimistic.liked ? "♥" : "♡"}</span>
+      <span aria-hidden className="text-base leading-none">
+        {optimistic.liked ? "♥" : "♡"}
+      </span>
       {optimistic.count}
     </button>
   );

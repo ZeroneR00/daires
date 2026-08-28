@@ -2,6 +2,7 @@
 
 import { useOptimistic, useTransition } from "react";
 import { toggleFollow } from "@/app/u/[username]/actions";
+import { pillButton } from "@/lib/ui";
 
 interface FollowButtonProps {
   targetUsername: string;
@@ -36,7 +37,10 @@ export function FollowButton({
       type="button"
       onClick={handleClick}
       disabled={isPending}
-      className="flex h-9 items-center rounded-full border border-black/[.08] px-4 text-sm font-medium text-black transition-colors hover:bg-black/[.04] disabled:opacity-60 dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+      /* Оба состояния — обычная «таблетка»: надпись здесь это действие
+         («Подписаться»/«Отписаться»), а не состояние, и заливка акцентом
+         читалась бы как совет отписаться. */
+      className={pillButton}
     >
       {optimistic.following ? "Отписаться" : "Подписаться"}
     </button>

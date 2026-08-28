@@ -10,14 +10,12 @@ import {
 } from "@/lib/friend-actions";
 import type { FriendshipStatus } from "@/lib/friends";
 import { useNotifications } from "@/components/NotificationsProvider";
+import { pillButton, pillButtonActive, pillButtonPrimary } from "@/lib/ui";
 
 interface FriendButtonProps {
   targetUsername: string;
   initialStatus: FriendshipStatus;
 }
-
-const buttonClass =
-  "flex h-9 items-center rounded-full border border-black/[.08] px-4 text-sm font-medium text-black transition-colors hover:bg-black/[.04] disabled:opacity-60 dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]";
 
 export function FriendButton({ targetUsername, initialStatus }: FriendButtonProps) {
   const [isPending, startTransition] = useTransition();
@@ -38,13 +36,15 @@ export function FriendButton({ targetUsername, initialStatus }: FriendButtonProp
     });
   }
 
+  // «Друзья» и «Заявка отправлена» — надписи-состояния, поэтому лёгкая
+  // заливка акцентом: связь уже есть. У остальных надпись это действие.
   if (status === "friends") {
     return (
       <button
         type="button"
         disabled={isPending}
         onClick={() => run("none", () => removeFriend(targetUsername))}
-        className={buttonClass}
+        className={pillButtonActive}
       >
         Друзья
       </button>
@@ -57,7 +57,7 @@ export function FriendButton({ targetUsername, initialStatus }: FriendButtonProp
         type="button"
         disabled={isPending}
         onClick={() => run("none", () => cancelFriendRequest(targetUsername))}
-        className={buttonClass}
+        className={pillButtonActive}
       >
         Заявка отправлена
       </button>
@@ -67,11 +67,13 @@ export function FriendButton({ targetUsername, initialStatus }: FriendButtonProp
   if (status === "pending_incoming") {
     return (
       <div className="flex items-center gap-2">
+        {/* Из двух кнопок акцентом залита одна: принять — то, ради чего
+            заявку показывают, отклонить — запасной выход */}
         <button
           type="button"
           disabled={isPending}
           onClick={() => run("friends", () => acceptFriendRequest(targetUsername))}
-          className={buttonClass}
+          className={pillButtonPrimary}
         >
           Принять
         </button>
@@ -79,7 +81,7 @@ export function FriendButton({ targetUsername, initialStatus }: FriendButtonProp
           type="button"
           disabled={isPending}
           onClick={() => run("none", () => declineFriendRequest(targetUsername))}
-          className={buttonClass}
+          className={pillButton}
         >
           Отклонить
         </button>
@@ -92,7 +94,7 @@ export function FriendButton({ targetUsername, initialStatus }: FriendButtonProp
       type="button"
       disabled={isPending}
       onClick={() => run("pending_outgoing", () => sendFriendRequest(targetUsername))}
-      className={buttonClass}
+      className={pillButton}
     >
       Добавить в друзья
     </button>

@@ -18,15 +18,15 @@ export default async function UserFriendsPage({ params }: UserFriendsPageProps) 
   const friends = await getFriends(user.id);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 bg-zinc-50 px-4 py-12 font-sans dark:bg-black">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-10 sm:px-6">
       <Link
         href={`/u/${user.username}`}
-        className="inline-flex w-fit items-center gap-1.5 text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+        className="inline-flex w-fit items-center gap-1.5 text-sm text-muted transition-colors hover:text-accent"
       >
         ← В дневник
       </Link>
 
-      <h1 className="text-xl font-semibold tracking-tight text-black dark:text-zinc-50">
+      <h1 className="font-serif text-2xl tracking-tight text-ink">
         Друзья {user.name}
       </h1>
 
@@ -37,8 +37,9 @@ export default async function UserFriendsPage({ params }: UserFriendsPageProps) 
           ))}
         </div>
       ) : (
-        <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-dashed border-black/[.15] p-6 text-center dark:border-white/[.2]">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">Друзей пока нет.</p>
+        <div className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-card border border-dashed border-line p-8 text-center">
+          <p className="font-serif text-lg text-ink">Здесь пока пусто</p>
+          <p className="text-sm text-muted">Друзей ещё нет.</p>
         </div>
       )}
     </div>

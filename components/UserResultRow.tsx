@@ -15,18 +15,16 @@ interface UserResultRowProps {
 
 export function UserResultRow({ user }: UserResultRowProps) {
   return (
+    // Ховер тот же, что у карточки записи: рамка теплеет до акцента, заливка
+    // не меняется — строк в списке много, и мигающий фон был бы шумом
     <Link
       href={`/u/${user.username}`}
-      className="flex items-center gap-3 rounded-lg border border-black/[.08] p-2 transition-colors hover:bg-black/[.03] dark:border-white/[.145] dark:hover:bg-white/[.06]"
+      className="flex items-center gap-3 rounded-card border border-line bg-surface p-3 transition-colors hover:border-accent/40"
     >
       <Avatar url={user.avatarUrl} size={40} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-black dark:text-zinc-50">
-          {user.name}
-        </p>
-        <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-          @{user.username}
-        </p>
+        <p className="truncate text-sm font-medium text-ink">{user.name}</p>
+        <p className="truncate text-xs text-muted">@{user.username}</p>
       </div>
     </Link>
   );

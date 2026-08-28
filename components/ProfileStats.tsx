@@ -5,9 +5,18 @@ interface ProfileStatsProps {
   memberSince: string;
 }
 
-// Подписи в форме "Записей: 3", а не "3 записи" — русская плюрализация
-// существительных требует трёх ветвей (1/2-4/5+), а числу-счётчику
-// согласование не нужно вообще.
+/*
+  Колофон дневника, а не дашборд: раньше это была вторая карточка подряд с
+  тремя крупными цифрами в сетке — на странице, где карточки принадлежат
+  записям, такой блок читался как виджет статистики. Теперь цифры лежат прямо
+  на бумаге, набраны антиквой и держатся строкой; коробки у них нет.
+
+  Подписи в форме "Записей: 3", а не "3 записи" — русская плюрализация
+  существительных требует трёх ветвей (1/2-4/5+), а числу-счётчику
+  согласование не нужно вообще. Отсюда и порядок «подпись сверху, число
+  снизу»: в обратном порядке блок читался бы как "12 Записей" и требовал бы
+  той самой плюрализации.
+*/
 export function ProfileStats({ stats, memberSince }: ProfileStatsProps) {
   const tiles = [
     { label: "Записей", value: stats.postCount },
@@ -16,32 +25,33 @@ export function ProfileStats({ stats, memberSince }: ProfileStatsProps) {
   ];
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-black">
-      <div className="grid grid-cols-3 gap-4">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap gap-x-10 gap-y-4">
         {tiles.map((tile) => (
-          <div key={tile.label} className="flex flex-col">
-            <span className="text-xl font-semibold tracking-tight text-black dark:text-zinc-50">
+          <div key={tile.label} className="flex flex-col gap-0.5">
+            <span className="text-xs text-muted">{tile.label}</span>
+            <span className="font-serif text-2xl leading-none text-ink">
               {tile.value}
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              {tile.label}
             </span>
           </div>
         ))}
       </div>
 
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        Ведёт дневник с {memberSince}
-      </p>
+      <div className="flex flex-col gap-1 text-sm text-muted">
+        <p>Ведёт дневник с {memberSince}</p>
 
-      {stats.topArtists.length > 0 && (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Топ артистов:{" "}
-          {stats.topArtists
-            .map((entry) => `${entry.artist} (${entry.count})`)
-            .join(", ")}
-        </p>
-      )}
+        {stats.topArtists.length > 0 && (
+          <p>
+            Чаще всего звучат:{" "}
+            {stats.topArtists.map((entry, index) => (
+              <span key={entry.artist}>
+                {index > 0 && ", "}
+                <span className="text-ink">{entry.artist}</span> ({entry.count})
+              </span>
+            ))}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -28,6 +28,23 @@ const SHAPES = {
     length: 110,
     width: 2,
   },
+  /*
+    Разрыв: нить идёт ровно, обрывается, концы отскакивают в разные стороны
+    и дальше нить продолжается. Не «всплеск наоборот» — отдельная геометрия,
+    третье слово словаря состояний: тишина / песня / обрыв.
+  */
+  broken: {
+    viewBox: "0 0 96 28",
+    flats: ["M0 14H34", "M62 14H96"],
+    // Два подпути в одной строке: концы разорванной нити рисуются акцентом,
+    // сама нить остаётся приглушённой, как во всех остальных вариантах.
+    // Концы зеркальны, а не параллельны: два одинаково наклонённых штриха
+    // читаются как «//», то есть просто пунктуация. Зеркало даёт излом,
+    // разломанный пополам, — это уже разрыв.
+    burst: "M34 14 38 7.5 M58 7.5 62 14",
+    length: 16,
+    width: 2,
+  },
   micro: {
     viewBox: "0 0 28 16",
     flats: [],
@@ -40,22 +57,52 @@ const SHAPES = {
 interface WavelineProps {
   className?: string;
   variant?: keyof typeof SHAPES;
+  /*
+    Третий глагол знака — «пишется». Штрих бесконечно прописывается слева
+    и уходит за правый край: язык состояний для loading.tsx. Дыхание для
+    этого занять нельзя, оно уже означает «играет превью», и лоадер,
+    который дышит, соврал бы.
+  */
+  writing?: boolean;
 }
 
-export function Waveline({ className = "", variant = "full" }: WavelineProps) {
+export function Waveline({
+  className = "",
+  variant = "full",
+  writing = false,
+}: WavelineProps) {
   // Знак живёт на весь сайт: играет превью где угодно на странице — дышит.
   const { playingId } = usePreviewPlayer();
   const shape = SHAPES[variant];
+
+  // Два режима на одном свойстве animation несовместимы: пишущийся знак
+  // не дышит, даже если где-то на фоне играет превью. Разорванная нить не
+  // дышит тоже — «оборвалось» не должно приплясывать под играющий трек.
+  const state = writing
+    ? "waveline--writing"
+    : playingId && variant !== "broken"
+      ? "waveline--live"
+      : "";
 
   return (
     <svg
       aria-hidden
       viewBox={shape.viewBox}
       fill="none"
-      className={`${playingId ? "waveline--live" : ""} ${className}`}
+      className={`${state} ${className}`}
       // Длина штриха уезжает в CSS переменной: «прорисовка» — одно правило
       // на оба размера, а не два почти одинаковых набора keyframes.
-      style={{ "--stroke-len": shape.length } as React.CSSProperties}
+      // Вторая граница — отдельной переменной, а не calc() в keyframes:
+      // значения с var() резолвятся поздно, calc внутри кадра так и остаётся
+      // нераскрытым, интерполировать его браузер не умеет и переключается на
+      // дискретную анимацию — знак скачками прыгает между двумя невидимыми
+      // краями. Проверено вживую: getKeyframes() отдавал ["110px", "calc(-110px)"].
+      style={
+        {
+          "--stroke-len": shape.length,
+          "--stroke-len-neg": -shape.length,
+        } as React.CSSProperties
+      }
     >
       {shape.flats.map((d) => (
         <path key={d} d={d} stroke="var(--line)" strokeWidth={1.5} />

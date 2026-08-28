@@ -286,3 +286,58 @@ body::before {
     animation: none;
   }
 }
+
+/*
+  Состояние «загружается»: штрих прописывается слева и уходит за правый край,
+  по кругу. Устройство — тот же приём, что и в разовой прорисовке, только
+  offset едет дальше нуля, в минус.
+
+  Почему это работает: при dasharray = L штрих и пробел равны длине пути.
+  offset = L прячет штрих целиком (в нуле пути стоит пробел), offset = 0
+  показывает целиком, offset = -L прячет опять — но уже «выехав» вправо.
+  Один прогон L → -L и есть полный цикл «написалось / стёрлось с хвоста».
+*/
+.waveline--writing .waveline__burst {
+  /* linear, а не ease: плавная кривая тормозит у краёв цикла, а края здесь —
+     это как раз мгновения, когда штрих спрятан целиком. */
+  animation: waveline-write 2s linear infinite;
+}
+
+@keyframes waveline-write {
+  from {
+    stroke-dashoffset: var(--stroke-len, 110);
+  }
+  to {
+    stroke-dashoffset: var(--stroke-len-neg, -110);
+  }
+}
+
+/*
+  Отложенное появление для экранов-состояний. Локально страницы отвечают за
+  ~80 мс, и лоадер без задержки мигает вспышкой — читается как глитч, а не
+  как загрузка. Быстрый переход не должен показывать его вовсе.
+*/
+.appear-delayed {
+  opacity: 0;
+  animation: appear-fade 0.45s ease 0.3s forwards;
+}
+
+@keyframes appear-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waveline--writing .waveline__burst {
+    animation: none;
+  }
+  /*
+    Здесь animation: none обязано идти в паре с opacity: 1 — иначе выключенная
+    анимация оставит базовый opacity: 0 и экран загрузки станет пустым.
+  */
+  .appear-delayed {
+    animation: none;
+    opacity: 1;
+  }
+}

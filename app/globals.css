@@ -18,6 +18,7 @@
   --accent-ink: #ffffff; /* текст на акцентной плашке */
   --accent-wash: #f6ece5; /* лёгкая заливка акцентом */
   --rule: rgba(28, 25, 23, 0.05); /* линовка страницы-тетради на фоне */
+  --danger: #9b1c1c; /* ошибки форм: заметно краснее терракоты, чтобы не путать с акцентом */
 
   /* Псевдонимы боилерплейта — их ещё используют старые компоненты */
   --background: var(--paper);
@@ -35,6 +36,7 @@
     --accent-ink: #1a120d;
     --accent-wash: #2a1d16;
     --rule: rgba(240, 234, 226, 0.05);
+    --danger: #f0a49c;
   }
 }
 
@@ -47,6 +49,7 @@
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-accent-wash: var(--accent-wash);
+  --color-danger: var(--danger);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -156,9 +159,14 @@ body::after {
   filter: blur(56px) saturate(1.8);
   opacity: 0.33;
   pointer-events: none;
-  /* Затухание вправо: цвет живёт у обложки, а текст остаётся на чистой бумаге */
-  -webkit-mask-image: linear-gradient(to right, #000 0%, transparent 80%);
-  mask-image: linear-gradient(to right, #000 0%, transparent 80%);
+  /*
+    Затухание по кругу, а не только вправо: цвет живёт у обложки и растворяется
+    во все стороны. Горизонтальной маски хватало на мелкой карточке ленты, но на
+    крупной карточке записи низ и правый край блока оставались прямой границей —
+    свечение читалось серым прямоугольником, а не светом.
+  */
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 15%, transparent 100%);
+  mask-image: radial-gradient(circle closest-side, #000 15%, transparent 100%);
 }
 
 /*

@@ -10,23 +10,26 @@ interface CommentListProps {
 
 export function CommentList({ comments, currentUserId, deleteAction }: CommentListProps) {
   if (comments.length === 0) {
-    return (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">Комментариев пока нет</p>
-    );
+    return <p className="text-sm text-muted">Комментариев пока нет</p>;
   }
 
   return (
-    <ul className="flex flex-col gap-4">
+    <ul className="flex flex-col gap-3">
       {comments.map((comment) => (
-        <li key={comment.id} className="flex gap-3">
-          <Avatar url={comment.author.avatarUrl} size={28} />
+        /* Комментарий — своя маленькая карточка на бумаге: запись выше лежит
+           на surface, обсуждение под ней остаётся тише на тон */
+        <li
+          key={comment.id}
+          className="flex gap-3 rounded-card border border-line bg-surface/70 p-4"
+        >
+          <Avatar url={comment.author.avatarUrl} size={32} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="font-medium text-black dark:text-zinc-50">
+              <div className="flex min-w-0 items-center gap-2 text-sm">
+                <span className="truncate font-medium text-ink">
                   {comment.author.name}
                 </span>
-                <span className="text-zinc-500 dark:text-zinc-400">
+                <span className="shrink-0 text-muted">
                   {formatPostDate(comment.createdAt)}
                 </span>
               </div>
@@ -35,16 +38,14 @@ export function CommentList({ comments, currentUserId, deleteAction }: CommentLi
                   <input type="hidden" name="commentId" value={comment.id} />
                   <button
                     type="submit"
-                    className="text-xs text-zinc-500 hover:underline dark:text-zinc-400"
+                    className="shrink-0 text-xs text-muted transition-colors hover:text-accent"
                   >
                     Удалить
                   </button>
                 </form>
               )}
             </div>
-            <p className="whitespace-pre-wrap text-sm text-black dark:text-zinc-50">
-              {comment.text}
-            </p>
+            <p className="whitespace-pre-wrap text-sm text-ink">{comment.text}</p>
           </div>
         </li>
       ))}

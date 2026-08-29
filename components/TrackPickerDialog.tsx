@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { searchTracksAction } from "@/app/new/actions";
 import { TrackRow } from "@/components/TrackRow";
+import { field, pillButton, pillButtonActive } from "@/lib/ui";
 import type { NormalizedTrack } from "@/lib/track-api";
 
 interface TrackPickerDialogProps {
@@ -87,17 +88,17 @@ export function TrackPickerDialog({
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
-      className="m-auto w-full max-w-lg rounded-2xl border border-black/[.08] bg-white p-0 backdrop:bg-black/40 dark:border-white/[.145] dark:bg-zinc-900"
+      className="m-auto w-full max-w-lg rounded-card border border-line bg-surface p-0 backdrop:bg-ink/40 backdrop:backdrop-blur-sm"
     >
       <div className="flex max-h-[80vh] flex-col gap-4 p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-black dark:text-zinc-50">
+          <h2 className="font-serif text-lg tracking-tight text-ink">
             Найти трек
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-black/[.08] px-3 py-1 text-sm text-black dark:border-white/[.145] dark:text-zinc-50"
+            className={pillButton}
           >
             Готово
           </button>
@@ -108,20 +109,18 @@ export function TrackPickerDialog({
           value={query}
           onChange={(event) => handleQueryChange(event.target.value)}
           placeholder="Название трека или исполнитель"
-          className="w-full rounded-lg border border-black/[.08] bg-transparent px-3 py-2 text-sm text-black outline-none focus:border-black/[.3] dark:border-white/[.145] dark:text-zinc-50"
+          className={field}
           autoFocus
         />
 
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
 
         <div className="flex flex-col gap-2 overflow-y-auto">
           {isSearching && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Ищем…</p>
+            <p className="text-sm text-muted">Ищем…</p>
           )}
           {!isSearching && query.trim() && results.length === 0 && !error && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Ничего не найдено
-            </p>
+            <p className="text-sm text-muted">Ничего не найдено</p>
           )}
           {results.map((track) => {
             const alreadyAdded = selectedExternalIds.has(track.externalId);
@@ -134,7 +133,7 @@ export function TrackPickerDialog({
                   type="button"
                   disabled={alreadyAdded}
                   onClick={() => onSelectTrack(track)}
-                  className="shrink-0 rounded-full border border-black/[.08] px-3 py-1 text-xs font-medium text-black transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+                  className={`${alreadyAdded ? pillButtonActive : pillButton} shrink-0 disabled:cursor-not-allowed`}
                 >
                   {alreadyAdded ? "Уже добавлено" : "Добавить"}
                 </button>

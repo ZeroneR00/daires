@@ -2,11 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { TrackPickerDialog } from "@/components/TrackPickerDialog";
+import { field, pillButton, submitButton } from "@/lib/ui";
 import type { NormalizedTrack } from "@/lib/track-api";
 import type { PostInput } from "@/lib/post-schema";
 
-const textareaClassName =
-  "w-full rounded-lg border border-black/[.08] bg-white px-3 py-2 text-sm text-black outline-none transition-colors focus:border-black/30 dark:border-white/[.145] dark:bg-black dark:text-zinc-50 dark:focus:border-white/40";
+/*
+  Текст записи набирается той же антиквой, которой его потом читают на
+  странице записи: пишешь ровно то, что получится. `prose-diary` задаёт свой
+  размер шрифта и перебивает `text-sm` из `field` — обычная CSS-специфичность
+  плюс порядок слоёв: утилиты Tailwind лежат в `@layer utilities`, а правила
+  из `globals.css` вне слоёв, и потому сильнее.
+*/
+const diaryTextareaClassName = `${field} prose-diary min-h-40 resize-y`;
 
 const EMPTY_FORM_ERROR = "Добавь текст или хотя бы один трек";
 
@@ -60,58 +67,50 @@ export function PostForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="text" className="text-sm font-medium text-black dark:text-zinc-50">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <div className="flex flex-col gap-2">
+        <label htmlFor="text" className="text-sm font-medium text-ink">
           Текст записи
         </label>
         <textarea
           id="text"
-          rows={6}
+          rows={8}
           value={text}
           onChange={(event) => setText(event.target.value)}
           placeholder="О чём этот трек, что он для тебя значит…"
-          className={textareaClassName}
+          className={diaryTextareaClassName}
         />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-black dark:text-zinc-50">
-            Треки
-          </span>
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-medium text-ink">Треки</span>
           <button
             type="button"
             onClick={() => setIsDialogOpen(true)}
-            className="rounded-full border border-black/[.08] px-3 py-1 text-xs font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+            className={pillButton}
           >
             Добавить трек
           </button>
         </div>
 
         {selectedTracks.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Треки ещё не добавлены
-          </p>
+          <p className="text-sm text-muted">Треки ещё не добавлены</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {selectedTracks.map((track) => (
               <li
                 key={track.externalId}
-                className="flex items-center gap-3 rounded-lg border border-black/[.08] p-2 dark:border-white/[.145]"
+                className="flex items-center gap-3 rounded-card border border-line bg-surface p-2.5"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-black dark:text-zinc-50">
-                    {track.title}
-                  </p>
-                  <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                    {track.artist}
-                  </p>
+                  <p className="truncate text-sm font-medium text-ink">{track.title}</p>
+                  <p className="truncate text-xs text-muted">{track.artist}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleRemoveTrack(track.externalId)}
-                  className="shrink-0 rounded-full border border-black/[.08] px-3 py-1 text-xs font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+                  className={`${pillButton} shrink-0`}
                 >
                   Убрать
                 </button>
@@ -121,13 +120,9 @@ export function PostForm({
         )}
       </div>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={isPending || isEmpty}
-        className="mt-2 flex h-11 w-full items-center justify-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
-      >
+      <button type="submit" disabled={isPending || isEmpty} className={submitButton}>
         {isPending ? pendingLabel : submitLabel}
       </button>
 

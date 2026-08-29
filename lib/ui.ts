@@ -24,3 +24,25 @@ export const pillButtonActive =
 /** Главное действие блока — залитая акцентом (например «Принять» в паре с «Отклонить») */
 export const pillButtonPrimary =
   "flex h-9 items-center rounded-full bg-accent px-4 text-sm font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-60";
+
+/*
+  Поле ввода: одна строка на все формы проекта. Появилась на форме комментария
+  в шаге 1 и к заходу B успела понадобиться ещё трижды (текст записи, поиск
+  трека, дальше — настройки и вход), поэтому переехала сюда.
+
+  `outline-none` вместе с `focus:border-accent/60` — не отключение фокуса,
+  а его замена: рамка теплеет акцентом. Без второго правила первое было бы
+  дырой в доступности.
+*/
+export const field =
+  "w-full rounded-card border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-accent/60";
+
+/**
+ * Главное действие формы — во всю ширину и выше «таблетки»: у формы оно
+ * ровно одно, и мельчить ему незачем. `pillButtonPrimary` сюда не годится
+ * не по смыслу, а по размеру: дописать к нему `h-11 w-full` нельзя —
+ * порядок `h-9`/`h-11` в готовом CSS решает Tailwind, а не порядок слов
+ * в строке.
+ */
+export const submitButton =
+  "flex h-11 w-full items-center justify-center rounded-full bg-accent px-5 text-sm font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50";

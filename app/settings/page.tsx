@@ -15,19 +15,26 @@ export default async function SettingsPage() {
   if (!user) redirect("/login");
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 bg-zinc-50 px-4 py-12 font-sans dark:bg-black">
-      <div className="rounded-2xl border border-black/[.08] bg-white p-8 dark:border-white/[.145] dark:bg-black">
-        <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
+    /*
+      Коробки вокруг всего нет — три блока подряд (фото, имя, о себе) в одной
+      рамке и были той «панелью управления», от которой ушли дневник автора
+      и форма записи. Заголовок лежит на бумаге, блоки разделяет волосяная
+      линейка, а карточками остаются сами поля.
+    */
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-10 sm:px-6">
+      <header className="flex flex-col gap-2">
+        <h1 className="font-serif text-2xl tracking-tight text-ink">
           Настройки профиля
         </h1>
+        <p className="text-sm text-muted">
+          Каким тебя видят на страницах дневника.
+        </p>
+      </header>
 
-        <div className="mt-6">
-          <AvatarUploadForm initialAvatarUrl={user.avatarUrl} />
-        </div>
+      <AvatarUploadForm initialAvatarUrl={user.avatarUrl} />
 
-        <div className="mt-6 border-t border-black/[.08] pt-6 dark:border-white/[.145]">
-          <SettingsForm initialName={user.name} initialBio={user.bio ?? ""} />
-        </div>
+      <div className="border-t border-line pt-6">
+        <SettingsForm initialName={user.name} initialBio={user.bio ?? ""} />
       </div>
     </div>
   );

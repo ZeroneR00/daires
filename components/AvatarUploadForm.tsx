@@ -2,9 +2,17 @@
 
 import { useActionState, useState } from "react";
 import { Avatar } from "@/components/Avatar";
-import { removeAvatar, uploadAvatar, type AvatarActionState } from "@/app/settings/actions";
+import {
+  removeAvatar,
+  uploadAvatar,
+  type AvatarActionState,
+} from "@/app/settings/actions";
+import { pillButton } from "@/lib/ui";
 
-const initialActionState: AvatarActionState = { success: true, avatarUrl: null };
+const initialActionState: AvatarActionState = {
+  success: true,
+  avatarUrl: null,
+};
 
 interface AvatarUploadFormProps {
   initialAvatarUrl: string | null;
@@ -12,9 +20,10 @@ interface AvatarUploadFormProps {
 
 export function AvatarUploadForm({ initialAvatarUrl }: AvatarUploadFormProps) {
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
-  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(
-    null,
-  );
+  const [message, setMessage] = useState<{
+    type: "error" | "success";
+    text: string;
+  } | null>(null);
 
   const [, uploadAction, isUploading] = useActionState(
     async (prevState: AvatarActionState, formData: FormData) => {
@@ -53,7 +62,12 @@ export function AvatarUploadForm({ initialAvatarUrl }: AvatarUploadFormProps) {
           <form action={uploadAction} className="flex flex-col gap-2">
             <label
               htmlFor="avatar-file"
-              className={`w-fit cursor-pointer rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] ${
+              /*
+                Контурная «таблетка», не залитая: на экране настроек главное
+                действие одно — «Сохранить» внизу, и залитых кнопок тоже должно
+                быть ровно одна.
+              */
+              className={`w-fit cursor-pointer ${pillButton} ${
                 isUploading ? "pointer-events-none opacity-50" : ""
               }`}
             >
@@ -75,7 +89,7 @@ export function AvatarUploadForm({ initialAvatarUrl }: AvatarUploadFormProps) {
               <button
                 type="submit"
                 disabled={isRemoving}
-                className="w-fit text-sm text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                className="w-fit text-sm text-danger underline-offset-4 hover:underline disabled:opacity-50"
               >
                 {isRemoving ? "Удаляем…" : "Удалить фото"}
               </button>
@@ -88,8 +102,8 @@ export function AvatarUploadForm({ initialAvatarUrl }: AvatarUploadFormProps) {
         <p
           className={
             message.type === "error"
-              ? "text-sm text-red-600 dark:text-red-400"
-              : "text-sm text-green-600 dark:text-green-400"
+              ? "text-sm text-danger"
+              : "text-sm text-accent"
           }
         >
           {message.text}

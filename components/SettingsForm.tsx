@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { updateProfile } from "@/app/settings/actions";
+import { field, submitButton } from "@/lib/ui";
 
-const inputClassName =
-  "w-full rounded-lg border border-black/[.08] bg-white px-3 py-2 text-sm text-black outline-none transition-colors focus:border-black/30 dark:border-white/[.145] dark:bg-black dark:text-zinc-50 dark:focus:border-white/40";
+const labelClassName = "text-sm font-medium text-ink";
 
 interface SettingsFormProps {
   initialName: string;
@@ -41,7 +41,7 @@ export function SettingsForm({ initialName, initialBio }: SettingsFormProps) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="name" className="text-sm font-medium text-black dark:text-zinc-50">
+        <label htmlFor="name" className={labelClassName}>
           Имя
         </label>
         <input
@@ -49,12 +49,12 @@ export function SettingsForm({ initialName, initialBio }: SettingsFormProps) {
           type="text"
           value={name}
           onChange={(event) => setName(event.target.value)}
-          className={inputClassName}
+          className={field}
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="bio" className="text-sm font-medium text-black dark:text-zinc-50">
+        <label htmlFor="bio" className={labelClassName}>
           О себе
         </label>
         <textarea
@@ -63,19 +63,22 @@ export function SettingsForm({ initialName, initialBio }: SettingsFormProps) {
           value={bio}
           onChange={(event) => setBio(event.target.value)}
           placeholder="Пара слов о себе…"
-          className={inputClassName}
+          className={field}
         />
       </div>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-      {success && (
-        <p className="text-sm text-green-600 dark:text-green-400">Сохранено</p>
-      )}
+      {error && <p className="text-sm text-danger">{error}</p>}
+      {/*
+        Успех красится акцентом, а не зелёным: зелёного в палитре нет, и заводить
+        токен ради одной строки значило бы завести второй акцент. Терракота на
+        сайте и так означает «здесь что-то произошло».
+      */}
+      {success && <p className="text-sm text-accent">Сохранено</p>}
 
       <button
         type="submit"
         disabled={isPending || !name.trim()}
-        className="mt-2 flex h-11 w-full items-center justify-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
+        className={`mt-2 ${submitButton}`}
       >
         {isPending ? "Сохраняем…" : "Сохранить"}
       </button>

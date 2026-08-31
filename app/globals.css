@@ -18,6 +18,7 @@
   --accent-ink: #ffffff; /* текст на акцентной плашке */
   --accent-wash: #f6ece5; /* лёгкая заливка акцентом */
   --rule: rgba(28, 25, 23, 0.05); /* линовка страницы-тетради на фоне */
+  --rule-margin: rgba(180, 71, 43, 0.16); /* вертикальное поле тетради, слева от колонки */
   --danger: #9b1c1c; /* ошибки форм: заметно краснее терракоты, чтобы не путать с акцентом */
 
   /* Псевдонимы боилерплейта — их ещё используют старые компоненты */
@@ -36,6 +37,7 @@
     --accent-ink: #1a120d;
     --accent-wash: #2a1d16;
     --rule: rgba(240, 234, 226, 0.05);
+    --rule-margin: rgba(224, 122, 80, 0.18);
     --danger: #f0a49c;
   }
 }
@@ -240,6 +242,34 @@ body::before {
   );
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
   mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
+}
+
+/*
+  Вертикальное поле тетради — та самая линия, за которую в тетради не заходят.
+  Живёт на `html::before`, а не вторым слоем в `body::before`: у линовки уже
+  есть своя геометрия, и подмешивать туда ещё один градиент значило бы
+  переписывать оба разом ради любой правки одного.
+
+  Линия привязана не к краю экрана, а к колонке содержимого
+  (`max-w-5xl` = 64rem, её левый край — `50% - 32rem`) и лежит на 2rem левее.
+  Поэтому она включается только с 72rem: на узком экране поля нет вовсе,
+  и линия прошла бы прямо по тексту, а не рядом с ним. Маска сверху — та же,
+  что у линовки: первый экран не должен выглядеть разлинованным бланком.
+*/
+@media (min-width: 72rem) {
+  html::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: calc(50% - 34rem);
+    width: 1px;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--rule-margin);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
+  }
 }
 
 /*

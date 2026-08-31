@@ -127,7 +127,7 @@ export function TrackPickerDialog({
             return (
               <div key={track.externalId} className="flex items-center gap-2">
                 <div className="min-w-0 flex-1">
-                  <TrackRow track={track} />
+                  <TrackRow track={track} trackId={track.externalId} />
                 </div>
                 <button
                   type="button"

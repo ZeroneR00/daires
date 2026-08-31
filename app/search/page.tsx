@@ -76,7 +76,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       {tracks.length > 0 && (
         <Section title="Треки">
           {tracks.map((track) => (
-            <TrackRow key={track.id} track={track} />
+            <TrackRow key={track.id} track={track} trackId={track.id} />
           ))}
         </Section>
       )}

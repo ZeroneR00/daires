@@ -9,6 +9,7 @@ import {
   ignoreFriendRequest,
 } from "@/lib/friend-actions";
 import { useNotifications } from "@/components/NotificationsProvider";
+import { pillButton, pillButtonPrimary } from "@/lib/ui";
 
 interface IncomingRequestRowProps {
   requester: { username: string; name: string; avatarUrl: string | null };
@@ -16,9 +17,6 @@ interface IncomingRequestRowProps {
   // две работают как обычно — отложенную заявку можно принять или отклонить.
   deferred?: boolean;
 }
-
-const buttonClass =
-  "flex h-8 items-center rounded-full border border-black/[.08] px-3 text-xs font-medium text-black transition-colors hover:bg-black/[.04] disabled:opacity-60 dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]";
 
 export function IncomingRequestRow({ requester, deferred = false }: IncomingRequestRowProps) {
   const [isPending, startTransition] = useTransition();
@@ -34,45 +32,51 @@ export function IncomingRequestRow({ requester, deferred = false }: IncomingRequ
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-black/[.08] p-2 dark:border-white/[.145]">
-      <Link href={`/u/${requester.username}`} className="flex min-w-0 flex-1 items-center gap-3">
+    // flex-wrap + basis-full: на узком экране кнопки уезжают на свою строку,
+    // а не сдавливают имя в пару символов. Ховер — только на имени: строка
+    // целиком не ссылка, подсвечивать её всю значило бы врать про клик.
+    <div className="flex flex-wrap items-center gap-3 rounded-card border border-line bg-surface p-3">
+      <Link
+        href={`/u/${requester.username}`}
+        className="group flex min-w-0 flex-1 basis-full items-center gap-3 sm:basis-auto"
+      >
         <Avatar url={requester.avatarUrl} size={40} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-black dark:text-zinc-50">
+          <p className="truncate text-sm font-medium text-ink transition-colors group-hover:text-accent">
             {requester.name}
           </p>
-          <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-            @{requester.username}
-          </p>
+          <p className="truncate text-xs text-muted">@{requester.username}</p>
         </div>
       </Link>
-      <button
-        type="button"
-        disabled={isPending}
-        onClick={() => run(() => acceptFriendRequest(requester.username))}
-        className={buttonClass}
-      >
-        Принять
-      </button>
-      <button
-        type="button"
-        disabled={isPending}
-        onClick={() => run(() => declineFriendRequest(requester.username))}
-        className={buttonClass}
-      >
-        Отклонить
-      </button>
-      {!deferred && (
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           disabled={isPending}
-          onClick={() => run(() => ignoreFriendRequest(requester.username))}
-          title="Заявка останется, но перестанет напоминать о себе"
-          className={buttonClass}
+          onClick={() => run(() => acceptFriendRequest(requester.username))}
+          className={pillButtonPrimary}
         >
-          Позже
+          Принять
         </button>
-      )}
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => run(() => declineFriendRequest(requester.username))}
+          className={pillButton}
+        >
+          Отклонить
+        </button>
+        {!deferred && (
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => run(() => ignoreFriendRequest(requester.username))}
+            title="Заявка останется, но перестанет напоминать о себе"
+            className={pillButton}
+          >
+            Позже
+          </button>
+        )}
+      </div>
     </div>
   );
 }

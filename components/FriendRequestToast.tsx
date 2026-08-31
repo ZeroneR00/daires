@@ -32,9 +32,9 @@ export function FriendRequestToast() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-black/[.08] bg-background px-4 py-3 text-sm shadow-lg dark:border-white/[.145]"
+      className="fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-card border border-line bg-surface px-4 py-3 text-sm shadow-lg"
     >
-      <span className="text-zinc-700 dark:text-zinc-300">
+      <span className="text-ink">
         {announcement.count === 1
           ? `Заявка в друзья от @${announcement.latestUsername}`
           : `Заявки в друзья: ${announcement.count}`}
@@ -42,7 +42,7 @@ export function FriendRequestToast() {
       <Link
         href="/friends"
         onClick={() => setDismissed(announcement)}
-        className="font-medium text-black hover:underline dark:text-zinc-50"
+        className="font-medium text-accent transition-opacity hover:opacity-80"
       >
         Посмотреть
       </Link>
@@ -50,7 +50,7 @@ export function FriendRequestToast() {
         type="button"
         onClick={() => setDismissed(announcement)}
         aria-label="Закрыть"
-        className="text-zinc-500 transition-colors hover:text-black dark:hover:text-zinc-50"
+        className="text-muted transition-colors hover:text-accent"
       >
         ✕
       </button>

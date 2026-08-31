@@ -18,12 +18,10 @@ export default async function MessagesPage() {
   const conversations = await getConversationList(session.user.id);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 bg-zinc-50 px-4 py-12 font-sans dark:bg-black">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-10 sm:px-6">
       <RefreshOnPing />
 
-      <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
-        Сообщения
-      </h1>
+      <h1 className="font-serif text-2xl tracking-tight text-ink">Сообщения</h1>
 
       {conversations.length > 0 ? (
         <div className="flex flex-col gap-2">
@@ -39,13 +37,11 @@ export default async function MessagesPage() {
           ))}
         </div>
       ) : (
-        <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-black/[.15] p-6 text-center dark:border-white/[.2]">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Переписки пока нет.
-          </p>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <div className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-card border border-dashed border-line p-8 text-center">
+          <p className="font-serif text-lg text-ink">Здесь пока тихо</p>
+          <p className="text-sm text-muted">
             Писать можно друзьям — начни со{" "}
-            <Link href="/friends" className="hover:underline">
+            <Link href="/friends" className="text-accent transition-opacity hover:opacity-80">
               списка друзей
             </Link>
             .

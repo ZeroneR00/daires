@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { sendMessage } from "@/lib/message-actions";
+import { field, pillButtonPrimary } from "@/lib/ui";
 
 interface MessageFormProps {
   targetUsername: string;
@@ -33,21 +34,23 @@ export function MessageForm({ targetUsername }: MessageFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
         rows={3}
         placeholder="Написать сообщение…"
-        className="w-full rounded-lg border border-black/[.08] bg-white px-3 py-2 text-sm text-black outline-none transition-colors focus:border-black/30 dark:border-white/[.145] dark:bg-black dark:text-zinc-50 dark:focus:border-white/40"
+        className={`${field} resize-y`}
       />
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
+      {/* Кнопка не во всю ширину (submitButton), а «таблеткой»: сообщение —
+          действие повторяющееся и мелкое, у формы записи оно одно и главное. */}
       <button
         type="submit"
         disabled={isPending || !text.trim()}
-        className="flex h-9 w-fit items-center justify-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
+        className={`${pillButtonPrimary} w-fit justify-center`}
       >
         {isPending ? "Отправляем…" : "Отправить"}
       </button>

@@ -37,29 +37,33 @@ export default async function ConversationPage({ params }: ConversationPageProps
   const messages = conversation ? await getMessages(conversation.id) : [];
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 bg-zinc-50 px-4 py-12 font-sans dark:bg-black">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-10 sm:px-6">
       <RefreshOnPing />
       <MarkReadOnOpen otherUsername={other.username} />
 
       <Link
         href="/messages"
-        className="inline-flex w-fit items-center gap-1.5 text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+        className="inline-flex w-fit items-center gap-1.5 text-sm text-muted transition-colors hover:text-accent"
       >
         ← Все диалоги
       </Link>
 
+      {/*
+        Собеседник — заголовок этой страницы, а не карточка в ней: своего h1
+        у диалога нет, и коробка вокруг имени спорила бы с пузырями переписки
+        (тот же ход, что сделал из шапки дневника титульный лист). Отделяет
+        его волосяная линейка, а не рамка.
+      */}
       <Link
         href={`/u/${other.username}`}
-        className="flex items-center gap-3 rounded-2xl border border-black/[.08] bg-white p-4 transition-colors hover:bg-black/[.03] dark:border-white/[.145] dark:bg-black dark:hover:bg-white/[.06]"
+        className="group flex items-center gap-3 border-b border-line pb-5"
       >
         <Avatar url={other.avatarUrl} size={48} />
         <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-black dark:text-zinc-50">
+          <p className="truncate font-serif text-xl tracking-tight text-ink transition-colors group-hover:text-accent">
             {other.name}
           </p>
-          <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">
-            @{other.username}
-          </p>
+          <p className="truncate text-sm text-muted">@{other.username}</p>
         </div>
       </Link>
 

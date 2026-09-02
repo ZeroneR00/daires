@@ -52,6 +52,7 @@
   --color-accent-ink: var(--accent-ink);
   --color-accent-wash: var(--accent-wash);
   --color-danger: var(--danger);
+  --color-rule-margin: var(--rule-margin);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

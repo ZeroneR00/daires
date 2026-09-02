@@ -45,7 +45,7 @@ export default async function Home() {
       )}
 
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:flex-row sm:px-6">
-      <main className="flex flex-1 flex-col gap-6">
+      <main className="flex min-w-0 flex-1 flex-col gap-6">
         {session ? (
           <div className="flex flex-col gap-1">
             <h1 className="font-serif text-3xl tracking-tight text-ink">

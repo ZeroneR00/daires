@@ -5,10 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import { SignOutButton } from "./SignOutButton";
 
 /*
-  Меню разделов для узкого экрана. На `< sm` семь элементов шапки в строку
-  не влезали и растягивали документ до ~745 px при вьюпорте 390 — страница
-  ехала вбок на каждом экране сайта. Разделы уезжают сюда, снаружи остаются
-  только знак, «Записать», лупа и эта кнопка.
+  Меню разделов для узкого экрана. Семь элементов шапки в строку не влезали
+  и растягивали документ шире вьюпорта — страница ехала вбок на каждом экране
+  сайта. Разделы уезжают сюда, снаружи остаются только знак, «Записать»,
+  переключатель темы, лупа и эта кнопка.
+
+  Порог — `lg`, а не `sm`: с `sm` полный ряд включался уже на 640 px, где ему
+  нужно ~936, и переполнение просто переезжало с 390 на 640–1023 (замерено).
 
   Компонент намеренно презентационный: своих хуков не зовёт, всё приезжает
   пропсами. Сессия и счётчики читаются по-прежнему в одном месте
@@ -55,7 +58,7 @@ export function MobileMenu({
         onClick={() => setOpen(true)}
         aria-label="Меню"
         aria-haspopup="dialog"
-        className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-muted transition-colors hover:border-accent hover:text-accent sm:hidden"
+        className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-muted transition-colors hover:border-accent hover:text-accent lg:hidden"
       >
         <MenuIcon />
         {hasNotice && (

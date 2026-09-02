@@ -48,8 +48,14 @@ export function SessionStatus() {
           <span className="hidden sm:inline">Добавить запись</span>
         </Link>
 
-        {/* Ряд разделов — только с sm и выше; ниже его заменяет MobileMenu */}
-        <div className="hidden items-center gap-4 sm:flex">
+        {/*
+          Ряд разделов — только с lg и выше; ниже его заменяет MobileMenu.
+          Порог именно lg, а не sm: полному ряду (четыре раздела + имя +
+          «Выйти» + «Добавить запись» + знак + лупа + тема) нужно ~936 px,
+          и на 640–1023 он растягивал документ шире вьюпорта — страница
+          ехала вбок ровно так же, как когда-то на 390.
+        */}
+        <div className="hidden items-center gap-4 lg:flex">
           <Link href={`/u/${data.user.username}`} className={navLinkClassName}>
             Мой дневник
           </Link>
@@ -69,7 +75,10 @@ export function SessionStatus() {
             <Link
               href="/settings"
               title="Настройки профиля"
-              className="max-w-[9rem] truncate text-sm font-medium text-ink hover:text-accent"
+              /* На 1024 ряд стоит впритык: имя во всю прежнюю ширину
+                 вылезало за вьюпорт на 11 px (замерено). Полные 9rem
+                 возвращаются с xl, где место есть. */
+              className="max-w-28 truncate text-sm font-medium text-ink hover:text-accent xl:max-w-36"
             >
               {data.user.username}
             </Link>

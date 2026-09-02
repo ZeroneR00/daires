@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 import { FriendRequestToast } from "@/components/FriendRequestToast";
 import { NotificationsProvider } from "@/components/NotificationsProvider";
 import { PreviewPlayerProvider } from "@/components/PreviewPlayer";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 // subsets обязаны включать cyrillic: без него next/font не кладёт
@@ -30,11 +31,21 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
+    // suppressHydrationWarning — точечно на <html> и только из-за data-theme:
+    // атрибут ставит инлайн-скрипт до React, и при сверке разметки React
+    // увидит расхождение с серверной. Ниже по дереву предупреждения работают
+    // как обычно.
     <html
       lang="ru"
       className={`${geistSans.variable} ${literata.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col bg-paper text-ink">
+        {/*
+          Первым делом в теле страницы и синхронно: скрипт красит документ до
+          того, как браузер дойдёт до содержимого. Подробности — в lib/theme.ts
+        */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <NotificationsProvider>
           <PreviewPlayerProvider>
           <Header />

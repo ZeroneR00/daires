@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SearchDialog } from "./SearchDialog";
+import { ThemeToggle } from "./ThemeToggle";
 import { Waveline } from "./Waveline";
 import { SessionStatus } from "./SessionStatus";
 
@@ -19,6 +20,7 @@ export function Header() {
 
 
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <SearchDialog />
           <SessionStatus />
         </div>

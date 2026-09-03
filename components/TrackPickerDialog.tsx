@@ -11,6 +11,8 @@ interface TrackPickerDialogProps {
   onClose: () => void;
   selectedExternalIds: Set<string>;
   onSelectTrack: (track: NormalizedTrack) => void;
+  /** Сколько ещё треков можно добавить. На нуле кнопки гаснут. */
+  remainingSlots: number;
 }
 
 const DEBOUNCE_MS = 400;
@@ -20,7 +22,9 @@ export function TrackPickerDialog({
   onClose,
   selectedExternalIds,
   onSelectTrack,
+  remainingSlots,
 }: TrackPickerDialogProps) {
+  const isFull = remainingSlots <= 0;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const requestIdRef = useRef(0);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -114,6 +118,11 @@ export function TrackPickerDialog({
         />
 
         {error && <p className="text-sm text-danger">{error}</p>}
+        {isFull && (
+          <p className="text-sm text-muted">
+            Достигнут предел — 20 треков
+          </p>
+        )}
 
         <div className="flex flex-col gap-2 overflow-y-auto">
           {isSearching && (
@@ -124,14 +133,20 @@ export function TrackPickerDialog({
           )}
           {results.map((track) => {
             const alreadyAdded = selectedExternalIds.has(track.externalId);
+            const disabled = alreadyAdded || isFull;
             return (
               <div key={track.externalId} className="flex items-center gap-2">
                 <div className="min-w-0 flex-1">
                   <TrackRow track={track} trackId={track.externalId} />
+                  {/* Помечаем немой трек здесь же — иначе его добавляют
+                      вслепую и узнают об отсутствии превью только в записи */}
+                  {!track.previewUrl && (
+                    <p className="mt-1 text-xs text-muted">Без превью</p>
+                  )}
                 </div>
                 <button
                   type="button"
-                  disabled={alreadyAdded}
+                  disabled={disabled}
                   onClick={() => onSelectTrack(track)}
                   className={`${alreadyAdded ? pillButtonActive : pillButton} shrink-0 disabled:cursor-not-allowed`}
                 >

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { getFeedPosts, getLikedPostIds } from "@/lib/posts";
+import { getSiteStats } from "@/lib/stats";
 import { PostCard } from "@/components/PostCard";
 import { HomeHero } from "@/components/HomeHero";
 import { Groove } from "@/components/Groove";
@@ -11,9 +12,10 @@ export const dynamic = "force-dynamic";
 const cardClassName = "rounded-card border border-line bg-surface p-6";
 
 export default async function Home() {
-  const [session, posts] = await Promise.all([
+  const [session, posts, siteStats] = await Promise.all([
     auth.api.getSession({ headers: await headers() }),
     getFeedPosts(),
+    getSiteStats(),
   ]);
   const likedPostIds = session
     ? await getLikedPostIds(
@@ -32,31 +34,18 @@ export default async function Home() {
         .filter((url): url is string => url !== null),
     ),
   );
-  const authorCount = new Set(posts.map((post) => post.authorId)).size;
 
   return (
     <>
-      {!session && (
-        <HomeHero
-          artworks={artworks}
-          postCount={posts.length}
-          authorCount={authorCount}
-        />
-      )}
+      <HomeHero
+        artworks={artworks}
+        postCount={siteStats.postCount}
+        authorCount={siteStats.authorCount}
+        username={session?.user.username}
+      />
 
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:flex-row sm:px-6">
       <main className="flex min-w-0 flex-1 flex-col gap-6">
-        {session ? (
-          <div className="flex flex-col gap-1">
-            <h1 className="font-serif text-3xl tracking-tight text-ink">
-              Привет, {session.user.username}
-            </h1>
-            <p className="text-sm text-muted">
-              Что звучало у тебя сегодня?
-            </p>
-          </div>
-        ) : null}
-
         {posts.length > 0 ? (
           <div className="flex flex-col gap-4">
             {posts.map((post, index) => (

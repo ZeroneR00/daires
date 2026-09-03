@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePreviewPlayer } from "@/components/PreviewPlayer";
+import type { QueueTrack } from "@/lib/track-queue";
 
 interface TrackArtworkProps {
   trackId: string;
@@ -11,6 +12,13 @@ interface TrackArtworkProps {
   artist: string;
   href?: string;
   size?: number;
+  /*
+    Очередь всей записи. Есть — кнопка запускает запись с начала и дальше сама
+    идёт по дорожкам: герой перестаёт быть отдельным треком и становится
+    кнопкой «слушать запись». Нет очереди (поиск, пикер) — прежнее одиночное
+    превью.
+  */
+  queue?: QueueTrack[];
 }
 
 /*
@@ -32,9 +40,20 @@ export function TrackArtwork({
   artist,
   href,
   size = 112,
+  queue,
 }: TrackArtworkProps) {
-  const { playingId, toggle } = usePreviewPlayer();
-  const isPlaying = playingId === trackId;
+  const { playingId, toggle, playQueue } = usePreviewPlayer();
+  /*
+    Обложка принадлежит записи, а не первой дорожке: пока звучит любой трек
+    очереди, пластинка крутится, а кнопка гасит запись целиком. Иначе на
+    втором треке герой выглядел бы остановленным, хотя запись играет.
+  */
+  const queuePlayingIndex = queue
+    ? queue.findIndex((item) => item.id === playingId)
+    : -1;
+  const isPlaying = queue ? queuePlayingIndex >= 0 : playingId === trackId;
+  const isAlbum = queue !== undefined && queue.length > 1;
+  const canPlay = previewUrl !== null || (queue?.length ?? 0) > 0;
 
   if (!artworkUrl) return null;
 
@@ -79,11 +98,26 @@ export function TrackArtwork({
 
       {href ? <Link href={href}>{cover}</Link> : cover}
 
-      {previewUrl && (
+      {canPlay && (
         <button
           type="button"
-          onClick={() => toggle(trackId, previewUrl)}
-          aria-label={isPlaying ? "Остановить превью" : "Послушать превью"}
+          /*
+            playQueue с индексом уже играющей дорожки означает «то же самое,
+            что звучит» — и провайдер трактует повторный запуск как стоп.
+            Отдельного stop() в контексте ради этого заводить не пришлось.
+          */
+          onClick={() =>
+            queue && queue.length > 0
+              ? playQueue(queue, queuePlayingIndex >= 0 ? queuePlayingIndex : 0)
+              : toggle(trackId, previewUrl!)
+          }
+          aria-label={
+            isPlaying
+              ? "Остановить"
+              : isAlbum
+                ? "Слушать запись"
+                : "Послушать превью"
+          }
           className={`absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center rounded-full bg-ink/70 text-paper backdrop-blur-sm transition-all duration-300 hover:scale-110 hover:bg-ink focus-visible:opacity-100 sm:opacity-0 sm:group-hover/art:opacity-100 ${
             isPlaying ? "sm:opacity-100" : ""
           }`}

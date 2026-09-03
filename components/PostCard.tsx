@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { formatPostDate, formatPostDateParts } from "@/lib/format-date";
 import { artworkAtSize } from "@/lib/artwork";
-import { TrackRow } from "@/components/TrackRow";
+import { PostTrackList } from "@/components/PostTrackList";
 import { Avatar } from "@/components/Avatar";
 import { TrackArtwork } from "@/components/TrackArtwork";
 import { Groove } from "@/components/Groove";
 import { LikeButton } from "@/components/LikeButton";
+import { buildQueue } from "@/lib/track-queue";
 import type { PostWithDetails } from "@/lib/posts";
 
 interface PostCardProps {
@@ -39,6 +40,9 @@ export function PostCard({
   // Первый трек играет роль обложки записи, остальные идут списком ниже.
   const [heroPostTrack, ...restTracks] = post.tracks;
   const hero = heroPostTrack?.track;
+  // Очередь собирается один раз на карточку и уходит и герою, и списку:
+  // запись играет альбомом, с какой дорожки её ни запусти.
+  const queue = buildQueue(post.tracks);
   const heroArtwork = artworkAtSize(hero?.artworkUrl ?? null, 300);
 
   return (
@@ -104,6 +108,7 @@ export function PostCard({
               artist={hero.artist}
               href={postHref}
               size={128}
+              queue={queue}
             />
           )}
 
@@ -132,17 +137,10 @@ export function PostCard({
           </div>
         </div>
 
-        {restTracks.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {restTracks.map((postTrack) => (
-              <TrackRow
-                key={postTrack.id}
-                track={postTrack.track}
-                showPreview={false}
-              />
-            ))}
-          </div>
-        )}
+        <PostTrackList
+          tracks={restTracks.map((postTrack) => postTrack.track)}
+          queue={queue}
+        />
 
         {/* Знак вместо простой линейки: та же роль разделителя, но узнаваемая.
             Разделитель есть у каждой карточки, а всплеск — через одну (showMark):

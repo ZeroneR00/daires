@@ -5,7 +5,8 @@ import { auth } from "@/lib/auth";
 import { formatPostDate } from "@/lib/format-date";
 import { artworkAtSize } from "@/lib/artwork";
 import { getPostBySlug, getCommentsForPost, getLikedPostIds } from "@/lib/posts";
-import { TrackRow } from "@/components/TrackRow";
+import { buildQueue } from "@/lib/track-queue";
+import { PostTrackList } from "@/components/PostTrackList";
 import { TrackArtwork } from "@/components/TrackArtwork";
 import { Avatar } from "@/components/Avatar";
 import { Groove } from "@/components/Groove";
@@ -41,6 +42,7 @@ export default async function PostPage({ params }: PostPageProps) {
   const [heroPostTrack, ...restTracks] = post.tracks;
   const hero = heroPostTrack?.track;
   const heroArtwork = artworkAtSize(hero?.artworkUrl ?? null, 400);
+  const queue = buildQueue(post.tracks);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-10 sm:px-6">
@@ -95,6 +97,7 @@ export default async function PostPage({ params }: PostPageProps) {
               title={hero.title}
               artist={hero.artist}
               size={176}
+              queue={queue}
             />
             <div className="min-w-0">
               <p className="font-serif text-xl leading-snug text-ink">
@@ -114,16 +117,11 @@ export default async function PostPage({ params }: PostPageProps) {
           </p>
         )}
 
-        {restTracks.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <p className="text-xs uppercase tracking-wide text-muted">
-              Ещё в записи
-            </p>
-            {restTracks.map((postTrack) => (
-              <TrackRow key={postTrack.id} track={postTrack.track} showPreview={false} />
-            ))}
-          </div>
-        )}
+        <PostTrackList
+          tracks={restTracks.map((postTrack) => postTrack.track)}
+          queue={queue}
+          heading="Ещё в записи"
+        />
 
         {/* Простая линейка, а не знак: знак на этой странице стоит один раз —
             границей между записью и обсуждением, ниже */}

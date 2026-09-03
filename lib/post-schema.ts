@@ -10,10 +10,12 @@ const trackSchema = z.object({
   previewUrl: z.string().nullable(),
 });
 
+export const MAX_TRACKS_PER_POST = 20;
+
 export const postInputSchema = z
   .object({
     text: z.string().trim(),
-    tracks: z.array(trackSchema),
+    tracks: z.array(trackSchema).max(MAX_TRACKS_PER_POST, "В записи не больше 20 треков"),
   })
   .refine((data) => data.text.length > 0 || data.tracks.length > 0, {
     message: "Добавь текст или хотя бы один трек",

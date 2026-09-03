@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { plural } from "@/lib/plural";
 
 interface HomeHeroProps {
   artworks: string[];
   postCount: number;
   authorCount: number;
+  /* Задан — «свой» извод (приветствие + одна кнопка); нет — гостевой */
+  username?: string;
 }
 
 const COLUMNS = 6;
@@ -17,8 +20,20 @@ const MIN_TILES = 30;
 
   Стена растворяется к центру маской, поэтому текст читается без плашки —
   затемняющий оверлей поверх картинок выглядел бы дёшево.
+
+  Экран показывается всем, но в двух изводах. Гостю он продаёт — полная высота,
+  слоган, две кнопки. Своему (`username` задан) он лишь здоровается: приветствие
+  вместо слогана, одна кнопка «Записать», высота урезана — свой приходит читать
+  ленту, и полноразмерный герой отправлял бы её за сгиб при каждом заходе.
 */
-export function HomeHero({ artworks, postCount, authorCount }: HomeHeroProps) {
+export function HomeHero({
+  artworks,
+  postCount,
+  authorCount,
+  username,
+}: HomeHeroProps) {
+  const isOwn = username !== undefined;
+
   // Раскладываем обложки по колонкам и дублируем: половина высоты уезжает,
   // вторая занимает её место — так цикл анимации не имеет видимого шва.
   const tiles: string[] = [];
@@ -60,41 +75,63 @@ export function HomeHero({ artworks, postCount, authorCount }: HomeHeroProps) {
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-5xl px-4 py-24 text-center sm:px-6 sm:py-32">
+      <div
+        className={`mx-auto w-full max-w-5xl px-4 text-center sm:px-6 ${
+          isOwn ? "py-14 sm:py-16" : "py-24 sm:py-32"
+        }`}
+      >
 
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
           Музыкальный дневник
         </p>
 
-        <h1 className="mx-auto mt-5 max-w-3xl font-serif text-4xl leading-[1.08] tracking-tight text-ink sm:text-6xl">
-          Дневник, который{" "}
-          <span className="relative whitespace-nowrap">
-            слушают
-            <span
-              aria-hidden
-              className="absolute -bottom-2 left-0 h-[0.13em] w-full rounded-full bg-accent/70"
-            />
-          </span>
-        </h1>
+        {isOwn ? (
+          <h1 className="mx-auto mt-5 max-w-3xl font-serif text-3xl leading-[1.08] tracking-tight text-ink sm:text-4xl">
+            Привет, {username}
+          </h1>
+        ) : (
+          <h1 className="mx-auto mt-5 max-w-3xl font-serif text-4xl leading-[1.08] tracking-tight text-ink sm:text-6xl">
+            Дневник, который{" "}
+            <span className="relative whitespace-nowrap">
+              слушают
+              <span
+                aria-hidden
+                className="absolute -bottom-2 left-0 h-[0.13em] w-full rounded-full bg-accent/70"
+              />
+            </span>
+          </h1>
+        )}
 
         <p className="prose-diary mx-auto mt-6 max-w-xl text-muted">
-          Каждая запись — личный текст и трек, который к нему прилагается.
-          Не плейлист, а то, что вокруг музыки происходит.
+          {isOwn
+            ? "Что звучало у тебя сегодня?"
+            : "Каждая запись — личный текст и трек, который к нему прилагается. Не плейлист, а то, что вокруг музыки происходит."}
         </p>
 
         <div className="mt-8 flex flex-wrap justify-center gap-3 text-sm font-medium">
-          <Link
-            href="/signup"
-            className="flex h-11 items-center rounded-full bg-accent px-6 text-accent-ink shadow-[0_10px_30px_-12px_var(--accent)] transition-transform hover:-translate-y-0.5"
-          >
-            Завести дневник
-          </Link>
-          <Link
-            href="/login"
-            className="flex h-11 items-center rounded-full border border-line bg-surface/70 px-6 text-ink backdrop-blur-sm transition-colors hover:border-accent hover:text-accent"
-          >
-            Войти
-          </Link>
+          {isOwn ? (
+            <Link
+              href="/new"
+              className="flex h-11 items-center rounded-full bg-accent px-6 text-accent-ink shadow-[0_10px_30px_-12px_var(--accent)] transition-transform hover:-translate-y-0.5"
+            >
+              Записать
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/signup"
+                className="flex h-11 items-center rounded-full bg-accent px-6 text-accent-ink shadow-[0_10px_30px_-12px_var(--accent)] transition-transform hover:-translate-y-0.5"
+              >
+                Завести дневник
+              </Link>
+              <Link
+                href="/login"
+                className="flex h-11 items-center rounded-full border border-line bg-surface/70 px-6 text-ink backdrop-blur-sm transition-colors hover:border-accent hover:text-accent"
+              >
+                Войти
+              </Link>
+            </>
+          )}
         </div>
 
         {postCount > 0 && (
@@ -107,13 +144,4 @@ export function HomeHero({ artworks, postCount, authorCount }: HomeHeroProps) {
       </div>
     </section>
   );
-}
-
-/* Русская плюрализация: 1 запись / 2 записи / 5 записей */
-function plural(n: number, one: string, few: string, many: string): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
 }

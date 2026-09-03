@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { TrackPickerDialog } from "@/components/TrackPickerDialog";
+import { TrackRow } from "@/components/TrackRow";
 import { field, pillButton, submitButton } from "@/lib/ui";
 import type { NormalizedTrack } from "@/lib/track-api";
-import type { PostInput } from "@/lib/post-schema";
+import { MAX_TRACKS_PER_POST, type PostInput } from "@/lib/post-schema";
 
 /*
   Текст записи набирается той же антиквой, которой его потом читают на
@@ -42,9 +43,11 @@ export function PostForm({
   const isEmpty = !text.trim() && selectedTracks.length === 0;
 
   function handleSelectTrack(track: NormalizedTrack) {
-    setSelectedTracks((prev) =>
-      prev.some((t) => t.externalId === track.externalId) ? prev : [...prev, track],
-    );
+    setSelectedTracks((prev) => {
+      if (prev.some((t) => t.externalId === track.externalId)) return prev;
+      if (prev.length >= MAX_TRACKS_PER_POST) return prev;
+      return [...prev, track];
+    });
   }
 
   function handleRemoveTrack(externalId: string) {
@@ -84,10 +87,16 @@ export function PostForm({
 
       <div className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm font-medium text-ink">Треки</span>
+          <span className="text-sm font-medium text-ink">
+            Треки{" "}
+            <span className="font-normal text-muted">
+              {selectedTracks.length} / {MAX_TRACKS_PER_POST}
+            </span>
+          </span>
           <button
             type="button"
             onClick={() => setIsDialogOpen(true)}
+            disabled={selectedTracks.length >= MAX_TRACKS_PER_POST}
             className={pillButton}
           >
             Добавить трек
@@ -97,15 +106,17 @@ export function PostForm({
         {selectedTracks.length === 0 ? (
           <p className="text-sm text-muted">Треки ещё не добавлены</p>
         ) : (
+          /*
+            TrackRow вместо самодельного <li> — побочный выигрыш ради
+            которого это и делается: выбранное наконец можно послушать,
+            не публикуя запись. "Убрать" — сестра строки, а не потомок:
+            та же композиция, что в пикере (TrackRow + кнопка снаружи).
+          */
           <ul className="flex flex-col gap-2">
             {selectedTracks.map((track) => (
-              <li
-                key={track.externalId}
-                className="flex items-center gap-3 rounded-card border border-line bg-surface p-2.5"
-              >
+              <li key={track.externalId} className="flex items-center gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-ink">{track.title}</p>
-                  <p className="truncate text-xs text-muted">{track.artist}</p>
+                  <TrackRow track={track} trackId={track.externalId} />
                 </div>
                 <button
                   type="button"
@@ -131,6 +142,7 @@ export function PostForm({
         onClose={() => setIsDialogOpen(false)}
         selectedExternalIds={selectedExternalIds}
         onSelectTrack={handleSelectTrack}
+        remainingSlots={MAX_TRACKS_PER_POST - selectedTracks.length}
       />
     </form>
   );

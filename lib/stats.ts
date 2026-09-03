@@ -9,6 +9,26 @@ export interface ProfileStats {
 
 const TOP_ARTISTS_LIMIT = 3;
 
+export interface SiteStats {
+  postCount: number;
+  authorCount: number;
+}
+
+// Счётчик на первом экране («Уже N записей от M авторов»). Живёт здесь, а не
+// в lib/posts.ts: там query-слой ленты, а это счётная логика — рядом с
+// getProfileStats. Два COUNT параллельно, уходят в тот же Promise.all, что и
+// сессия с лентой в app/page.tsx — страница не медленнее.
+// Авторы = пользователи хотя бы с одной записью, а не все зарегистрированные:
+// подпись обещает именно авторов.
+export async function getSiteStats(): Promise<SiteStats> {
+  const [postCount, authorCount] = await Promise.all([
+    prisma.post.count(),
+    prisma.user.count({ where: { posts: { some: {} } } }),
+  ]);
+
+  return { postCount, authorCount };
+}
+
 export async function getProfileStats(userId: string): Promise<ProfileStats> {
   const [postCount, likesReceived, postTracks] = await Promise.all([
     prisma.post.count({ where: { authorId: userId } }),

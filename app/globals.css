@@ -21,6 +21,17 @@
   --rule-margin: rgba(180, 71, 43, 0.16); /* вертикальное поле тетради, слева от колонки */
   --danger: #9b1c1c; /* ошибки форм: заметно краснее терракоты, чтобы не путать с акцентом */
 
+  /*
+    Стена обложек на первом экране. Светлая тема мешает обложки с бумагой
+    умножением, а не прозрачностью: полупрозрачность подмешивает бумагу
+    в каждый пиксель и тянет цвет к бежевой каше, умножение же оставляет
+    тёмное тёмным, а светлое отпускает в бумагу. Тёплый тон — чтобы стена
+    ушла в цвет бумаги, а не в серость.
+  */
+  --hero-blend: multiply;
+  --hero-tile: 0.7;
+  --hero-tone: sepia(0.22) saturate(1.25);
+
   /* Псевдонимы боилерплейта — их ещё используют старые компоненты */
   --background: var(--paper);
   --foreground: var(--ink);
@@ -48,6 +59,11 @@
     --rule: rgba(240, 234, 226, 0.05);
     --rule-margin: rgba(224, 122, 80, 0.18);
     --danger: #f0a49c;
+
+    /* На тёмной бумаге выцветать нечему: обычное смешивание и прежняя прозрачность */
+    --hero-blend: normal;
+    --hero-tile: 0.42;
+    --hero-tone: none;
     color-scheme: dark;
   }
 }
@@ -70,6 +86,11 @@
   --rule: rgba(240, 234, 226, 0.05);
   --rule-margin: rgba(224, 122, 80, 0.18);
   --danger: #f0a49c;
+
+  /* На тёмной бумаге выцветать нечему: обычное смешивание и прежняя прозрачность */
+  --hero-blend: normal;
+  --hero-tile: 0.42;
+  --hero-tone: none;
   color-scheme: dark;
 }
 
@@ -234,13 +255,34 @@ body::after {
   поэтому сдвиг на треть высоты замыкается без видимого шва.
 */
 .hero-wall {
-  opacity: 0.42;
-  -webkit-mask-image: radial-gradient(
-    115% 85% at 50% 45%,
-    transparent 36%,
-    #000 82%
-  );
-  mask-image: radial-gradient(115% 85% at 50% 45%, transparent 36%, #000 82%);
+  /*
+    Своя бумага под стеной — не для вида, а ради умножения: смешивать элемент
+    не с чем, если под ним внутри изолированного контекста ничего не нарисовано,
+    и mix-blend-mode на обложках просто ничего бы не сделал.
+  */
+  background: var(--paper);
+  isolation: isolate;
+
+  /*
+    Две маски вместо одной. Радиальная выедает середину под заголовок,
+    линейная гасит низ: без неё нижний ряд обложек обрезался краем секции
+    ровной линией, и стена читалась приклеенной полосой, а не фоном.
+    Композит intersect берёт минимум прозрачности из обеих.
+  */
+  -webkit-mask-image:
+    radial-gradient(115% 85% at 50% 45%, transparent 36%, #000 82%),
+    linear-gradient(#000 62%, transparent 100%);
+  mask-image:
+    radial-gradient(115% 85% at 50% 45%, transparent 36%, #000 82%),
+    linear-gradient(#000 62%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.hero-wall img {
+  mix-blend-mode: var(--hero-blend);
+  opacity: var(--hero-tile);
+  filter: var(--hero-tone);
 }
 
 .marquee-col {

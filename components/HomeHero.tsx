@@ -77,7 +77,7 @@ export function HomeHero({
 
       <div
         className={`mx-auto w-full max-w-5xl px-4 text-center sm:px-6 ${
-          isOwn ? "py-14 sm:py-16" : "py-24 sm:py-32"
+          isOwn ? "py-12 sm:py-14" : "py-24 sm:py-32"
         }`}
       >
 

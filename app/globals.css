@@ -1,26 +1,438 @@
 @import "tailwindcss";
 
+/*
+  Палитра «тёплый зин»: бумажная база, тёплый чёрный вместо чистого,
+  один акцент — терракота. Цвета живут здесь в виде переменных, а не в
+  разметке: тёмная тема переопределяет те же имена ниже, поэтому в
+  компонентах не нужен ни один `dark:`-вариант.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light dark;
+
+  --paper: #fbf8f3; /* фон страницы */
+  --surface: #ffffff; /* карточка поверх бумаги */
+  --ink: #1c1917; /* основной текст, тёплый чёрный */
+  --muted: #6b635c; /* подписи, даты, счётчики */
+  --line: #e7ded1; /* рамки и разделители */
+  --accent: #b4472b; /* терракота: ссылки-действия, активное состояние */
+  --accent-ink: #ffffff; /* текст на акцентной плашке */
+  --accent-wash: #f6ece5; /* лёгкая заливка акцентом */
+  --rule: rgba(28, 25, 23, 0.05); /* линовка страницы-тетради на фоне */
+  --rule-margin: rgba(180, 71, 43, 0.16); /* вертикальное поле тетради, слева от колонки */
+  --danger: #9b1c1c; /* ошибки форм: заметно краснее терракоты, чтобы не путать с акцентом */
+
+  /* Псевдонимы боилерплейта — их ещё используют старые компоненты */
+  --background: var(--paper);
+  --foreground: var(--ink);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/*
+  Тёмная тема достаётся двумя путями, и порядок правил ниже — это и есть вся
+  логика переключателя:
 
+  1. системная настройка — но только пока человек не выбрал светлую явно,
+     отсюда :not([data-theme="light"]);
+  2. явный выбор [data-theme="dark"] — вес селектора тот же, но правило стоит
+     ниже и потому выигрывает.
+*/
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --paper: #131110;
+    --surface: #1c1917;
+    --ink: #f0eae2;
+    --muted: #a29a92;
+    --line: #2e2926;
+    --accent: #e07a50; /* светлее светлой версии: на тёмном терракота глохнет */
+    --accent-ink: #1a120d;
+    --accent-wash: #2a1d16;
+    --rule: rgba(240, 234, 226, 0.05);
+    --rule-margin: rgba(224, 122, 80, 0.18);
+    --danger: #f0a49c;
+    color-scheme: dark;
   }
 }
 
+/*
+  Явный выбор тёмной. Значения повторены, а не унаследованы из блока выше:
+  CSS-переменную нельзя «взять из другого селектора», а собрать тёмную палитру
+  в общий класс на <html> значило бы, что цвет зависит ещё и от того, успел ли
+  скрипт этот класс навесить. Атрибут ставит скрипт, палитру держит только CSS.
+*/
+:root[data-theme="dark"] {
+  --paper: #131110;
+  --surface: #1c1917;
+  --ink: #f0eae2;
+  --muted: #a29a92;
+  --line: #2e2926;
+  --accent: #e07a50;
+  --accent-ink: #1a120d;
+  --accent-wash: #2a1d16;
+  --rule: rgba(240, 234, 226, 0.05);
+  --rule-margin: rgba(224, 122, 80, 0.18);
+  --danger: #f0a49c;
+  color-scheme: dark;
+}
+
+/*
+  Светлая выбрана явно при тёмной системе: палитра уже лежит в :root и
+  переопределять её нечем, остаётся вернуть светлый вид нативным элементам —
+  скроллбару, выпадающим спискам, полям ввода.
+*/
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
+  --color-danger: var(--danger);
+  --color-rule-margin: var(--rule-margin);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-literata), Georgia, "Times New Roman", serif;
+
+  --radius-card: 0.875rem;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+/* Текст дневника набирается антиквой — он тут главный, а не интерфейс */
+.prose-diary {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  letter-spacing: 0.003em;
+}
+
+::selection {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+/*
+  Винил: четыре слоя градиента вместо картинки — дырка, этикетка акцентом,
+  бороздки повторяющимся радиальным градиентом и само тело пластинки с бликом
+  слева сверху. Никаких ассетов, тема меняет цвет этикетки сама.
+*/
+.vinyl {
+  background:
+    radial-gradient(circle at 50% 50%, var(--paper) 0 3.5%, transparent 4%),
+    radial-gradient(circle at 50% 50%, var(--accent) 0 12%, transparent 12.5%),
+    repeating-radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 255, 255, 0.055) 0 1px,
+      rgba(255, 255, 255, 0) 1px 4px
+    ),
+    radial-gradient(circle at 32% 26%, #3b3431 0%, #16120f 62%, #0a0807 100%);
+  box-shadow: 0 14px 30px -16px rgba(0, 0, 0, 0.8);
+}
+
+.vinyl--spinning {
+  animation: vinyl-spin 3.2s linear infinite;
+}
+
+@keyframes vinyl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/*
+  Полоса проигранного под строкой трека. Ширину ведёт transform, а не width:
+  scaleX не вызывает layout, а `timeupdate` стреляет ~4 раза в секунду.
+  Саму переменную --p пишет в узел сам компонент, минуя React (см. TrackRow),
+  transition сглаживает эти редкие скачки до ровного хода.
+
+  В prefers-reduced-motion общее правило глушит длительность до 0.01ms, и
+  полоса пойдёт ступеньками по четверти секунды — правильный исход:
+  анимации нет, прогресс остался видимым.
+*/
+.track-progress {
+  transform: scaleX(var(--p, 0));
+  transform-origin: left;
+  transition: transform 0.25s linear;
+}
+
+/*
+  Зерно поверх всей страницы: бумага перестаёт выглядеть залитой краской.
+  Шум — процедурный SVG-фильтр в data-URI, файла картинки нет.
+*/
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Уважение к системной настройке: у кого укачивает — тому без вращения и выездов */
+@media (prefers-reduced-motion: reduce) {
+  .vinyl--spinning {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+  Цветное свечение карточки — размытая копия обложки её же трека. Картинка
+  приезжает переменной --glow из разметки, поэтому CSS остаётся статичным.
+
+  isolation: isolate + z-index: -1 у ::before — приём, который кладёт свечение
+  НАД фоном карточки, но ПОД её содержимым. Без isolate псевдоэлемент уехал бы
+  под саму карточку и пропал, а без z-index: -1 — лёг бы поверх текста.
+*/
+.glow-card {
+  isolation: isolate;
+}
+
+.glow-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -12%;
+  top: -30%;
+  width: 52%;
+  aspect-ratio: 1;
+  background-image: var(--glow);
+  background-size: cover;
+  background-position: center;
+  filter: blur(56px) saturate(1.8);
+  opacity: 0.33;
+  pointer-events: none;
+  /*
+    Затухание по кругу, а не только вправо: цвет живёт у обложки и растворяется
+    во все стороны. Горизонтальной маски хватало на мелкой карточке ленты, но на
+    крупной карточке записи низ и правый край блока оставались прямой границей —
+    свечение читалось серым прямоугольником, а не светом.
+  */
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 15%, transparent 100%);
+  mask-image: radial-gradient(circle closest-side, #000 15%, transparent 100%);
+}
+
+/*
+  Стена обложек на первом экране: колонки едут в разные стороны и растворяются
+  к центру, где лежит заголовок. Список обложек в разметке продублирован трижды,
+  поэтому сдвиг на треть высоты замыкается без видимого шва.
+*/
+.hero-wall {
+  opacity: 0.42;
+  -webkit-mask-image: radial-gradient(
+    115% 85% at 50% 45%,
+    transparent 36%,
+    #000 82%
+  );
+  mask-image: radial-gradient(115% 85% at 50% 45%, transparent 36%, #000 82%);
+}
+
+.marquee-col {
+  animation-name: marquee-up;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.marquee-col--down {
+  animation-name: marquee-down;
+}
+
+@keyframes marquee-up {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-33.333%);
+  }
+}
+
+@keyframes marquee-down {
+  from {
+    transform: translateY(-33.333%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-col {
+    animation: none;
+  }
+}
+
+/*
+  Линовка: страница лежит на тетрадном листе. Это дневник, и линейка в поле
+  зрения — самая честная метафора, какая тут может быть. Рисуется повторяющимся
+  градиентом, ассета нет; карточки (`bg-surface`) непрозрачны и накрывают её,
+  так что линовка видна только в полях и промежутках.
+
+  Маска сверху: под шапкой линовка проявляется не сразу, иначе первый экран
+  выглядит расчерченным бланком, а не бумагой.
+*/
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 31px,
+    var(--rule) 31px 32px
+  );
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
+}
+
+/*
+  Вертикальное поле тетради — та самая линия, за которую в тетради не заходят.
+  Живёт на `html::before`, а не вторым слоем в `body::before`: у линовки уже
+  есть своя геометрия, и подмешивать туда ещё один градиент значило бы
+  переписывать оба разом ради любой правки одного.
+
+  Линия привязана не к краю экрана, а к колонке содержимого
+  (`max-w-5xl` = 64rem, её левый край — `50% - 32rem`) и лежит на 2rem левее.
+  Поэтому она включается только с 72rem: на узком экране поля нет вовсе,
+  и линия прошла бы прямо по тексту, а не рядом с ним. Маска сверху — та же,
+  что у линовки: первый экран не должен выглядеть разлинованным бланком.
+*/
+@media (min-width: 72rem) {
+  html::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: calc(50% - 34rem);
+    width: 1px;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--rule-margin);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
+  }
+}
+
+/*
+  Подпись сайта — «Линия»: ровная нить, всплеск, снова ровная нить. Тишина,
+  песня, тишина; ровно то, чем является одна запись дневника. Один и тот же
+  знак работает и логотипом в шапке, и разделителем между блоками, и — при
+  желании — иконкой приложения: это просто штрих, ему всё равно, где лежать.
+
+  dasharray с нулевым offset в базовом состоянии, а не наоборот: линия по
+  умолчанию нарисована целиком, и любая другая анимация может подменить эту,
+  не заставив штрих исчезнуть (offset вернулся бы к своему базовому значению).
+*/
+.waveline__burst {
+  stroke-dasharray: var(--stroke-len, 110);
+  stroke-dashoffset: 0;
+  animation: waveline-draw 1.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@keyframes waveline-draw {
+  from {
+    stroke-dashoffset: var(--stroke-len, 110);
+  }
+}
+
+/*
+  Пока в вкладке играет превью — всплеск дышит. transform-box: fill-box меняет
+  систему координат трансформации на собственный bbox пути, иначе центром
+  масштабирования стал бы угол всего SVG и всплеск уехал бы вбок.
+*/
+.waveline--live .waveline__burst {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: waveline-pulse 1.05s ease-in-out infinite;
+}
+
+@keyframes waveline-pulse {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  35% {
+    transform: scaleY(1.28);
+  }
+  70% {
+    transform: scaleY(0.78);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waveline__burst,
+  .waveline--live .waveline__burst {
+    animation: none;
+  }
+}
+
+/*
+  Состояние «загружается»: штрих прописывается слева и уходит за правый край,
+  по кругу. Устройство — тот же приём, что и в разовой прорисовке, только
+  offset едет дальше нуля, в минус.
+
+  Почему это работает: при dasharray = L штрих и пробел равны длине пути.
+  offset = L прячет штрих целиком (в нуле пути стоит пробел), offset = 0
+  показывает целиком, offset = -L прячет опять — но уже «выехав» вправо.
+  Один прогон L → -L и есть полный цикл «написалось / стёрлось с хвоста».
+*/
+.waveline--writing .waveline__burst {
+  /* linear, а не ease: плавная кривая тормозит у краёв цикла, а края здесь —
+     это как раз мгновения, когда штрих спрятан целиком. */
+  animation: waveline-write 2s linear infinite;
+}
+
+@keyframes waveline-write {
+  from {
+    stroke-dashoffset: var(--stroke-len, 110);
+  }
+  to {
+    stroke-dashoffset: var(--stroke-len-neg, -110);
+  }
+}
+
+/*
+  Отложенное появление для экранов-состояний. Локально страницы отвечают за
+  ~80 мс, и лоадер без задержки мигает вспышкой — читается как глитч, а не
+  как загрузка. Быстрый переход не должен показывать его вовсе.
+*/
+.appear-delayed {
+  opacity: 0;
+  animation: appear-fade 0.45s ease 0.3s forwards;
+}
+
+@keyframes appear-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waveline--writing .waveline__burst {
+    animation: none;
+  }
+  /*
+    Здесь animation: none обязано идти в паре с opacity: 1 — иначе выключенная
+    анимация оставит базовый opacity: 0 и экран загрузки станет пустым.
+  */
+  .appear-delayed {
+    animation: none;
+    opacity: 1;
+  }
 }

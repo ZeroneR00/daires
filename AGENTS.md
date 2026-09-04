@@ -34,8 +34,423 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `/new` | Создание поста (поиск трека + текст) | только автор, залогинен |
 | `/post/[id]/edit` | Редактирование своего поста | только автор поста |
 | `/settings` | Профиль, аватар, bio | залогинен |
+| `/following` | Персональная лента (посты тех, на кого подписан) | залогинен |
+| `/messages` | Список диалогов | залогинен |
+| `/messages/[username]` | Диалог один-на-один | только друзья |
+| `/search` | Сквозной поиск (посты + треки + пользователи) | публично |
 | `/login`, `/signup` | Авторизация | публично |
+| `/rss.xml` | RSS-фид общей ленты | публично |
+| `/u/[username]/rss.xml` | RSS-фид дневника автора | публично |
  
+## Карта файлов
+
+Ниже — где что лежит, чтобы не приходилось грепать/сканировать весь проект
+ради ориентировки (актуально на 2026-08-10; если структура успела уйти
+вперёд — доверять коду, не этой таблице).
+
+**Auth**
+| Файл | Что там |
+|---|---|
+| `lib/auth.ts` | конфиг Better Auth (сервер): `prismaAdapter`, zod-валидация `username` |
+| `lib/auth-client.ts` | `authClient` для клиентских компонентов |
+| `app/api/auth/[...all]/route.ts` | catch-all route handler Better Auth |
+| `app/login/page.tsx`, `app/signup/page.tsx` | формы, зовут `authClient` напрямую (сознательное исключение из "мутации только через Server Actions" — это плюмбинг Better Auth, не бизнес-мутация) |
+
+**Layout / навигация**
+| Файл | Что там |
+|---|---|
+| `app/layout.tsx` | корневой layout, монтирует `<Header />` |
+| `components/Header.tsx` | шапка сайта |
+| `components/SessionStatus.tsx` | реактивная часть шапки (client component, `authClient.useSession()`) — не читать сессию через `auth.api.getSession()` здесь, layout не перечитывается при клиентской навигации |
+| `components/SignOutButton.tsx` | кнопка выхода |
+
+**Создание и редактирование поста (`/new`, `/post/[id]/edit`)**
+| Файл | Что там |
+|---|---|
+| `app/new/page.tsx` + `actions.ts` | страница создания поста; `createPost` Server Action + `searchTracksAction` |
+| `app/post/[id]/edit/page.tsx` + `actions.ts` | страница редактирования; `updatePost` Server Action. Guard на владение постом — на обоих уровнях (page → `notFound()`, action → ранний `return {error}`), не полагаться только на UI |
+| `components/PostForm.tsx` | общая форма (текст + треки), используется и на `/new`, и на `/post/[id]/edit`: пропы `initialText?`, `initialTracks?`, `action`, `submitLabel`, `pendingLabel` |
+| `components/TrackPickerDialog.tsx` | модалка поиска трека (`<dialog>`, дебаунс) |
+| `lib/post-schema.ts` | общая zod-схема `postInputSchema`/`PostInput`, используется и `createPost`, и `updatePost` — правило "текст ИЛИ трек, что-то одно обязательно" |
+| `lib/post-mutations.ts` | `attachTracksToPost` — общий upsert-Track-по-`externalId` + create-`PostTrack`, вызывается внутри транзакции из обоих экшенов |
+| `lib/track-api.ts` | обёртка над iTunes/MusicBrainz, тип `NormalizedTrack` |
+| `lib/slug.ts` | генерация уникального slug поста (не меняется при редактировании) |
+
+**Настройки профиля (`/settings`)**
+| Файл | Что там |
+|---|---|
+| `app/settings/page.tsx` | `auth.api.getSession()` → `redirect("/login")` если нет сессии; префилл через `getUserByUsername` (`lib/posts.ts`), рендерит `AvatarUploadForm` и `SettingsForm` |
+| `app/settings/actions.ts` | `updateProfile` Server Action — session check, zod-парсинг, `prisma.user.update({ name, bio })` напрямую (не через `authClient.updateUser()` — `bio` не зарегистрирован как Better Auth `additionalField`), без redirect, `revalidatePath` для `/` и `/u/[username]`. Плюс `uploadAvatar`/`removeAvatar` — тот же session-check, файл валидируется `avatarFileSchema`, путь в bucket фиксированный `avatars/<userId>` с `{ upsert: true }` (перезаписывает старый файл, без явного удаления), публичный URL кэш-бастится `?v=<timestamp>` при каждой загрузке |
+| `lib/profile-schema.ts` | `profileInputSchema`/`ProfileInput` — `name` обязателен (`max(100)`), `bio` опционален (`max(280)`, пустая строка → `null`). Плюс `avatarFileSchema`/`MAX_AVATAR_SIZE`/`ALLOWED_AVATAR_TYPES` — ≤3 МБ, только `image/jpeg`\|`image/png`\|`image/webp` (SVG сознательно исключён — может содержать `<script>`) |
+| `components/SettingsForm.tsx` | форма по образу `PostForm`: поля `name`/`bio`, клиентская проверка непустого имени, инлайн "Сохранено" вместо редиректа |
+| `components/AvatarUploadForm.tsx` | client-компонент, нативный `<form action={fn}>` + `FormData` + `useActionState` (не `useTransition`, как в `SettingsForm` — `File` нельзя передать JS-объектом) для `uploadAvatar`/`removeAvatar`; локальный `avatarUrl`/`message` state обновляется внутри самих action-обёрток. `<input type="file">` спрятан (`hidden`) и триггерится стилизованным `<label htmlFor>` — нативный вид инпута не стилизуется CSS; выбор файла сам вызывает `form.requestSubmit()` в `onChange`, отдельной кнопки "Загрузить" нет (раньше была — путала: клик мимо крошечного нативного поля сразу давал "Файл не выбран") |
+| `components/Avatar.tsx` | общий презентационный компонент (`url`, `size?`) — фото или кружок-плейсхолдер; переиспользуется на `/settings`, `/u/[username]`, `PostCard`, странице поста |
+
+**Чтение данных (лента / дневник / пост)**
+| Файл | Что там |
+|---|---|
+| `lib/posts.ts` | единый query-слой: `getFeedPosts`, `getPostsByUsername`, `getPostBySlug`, `getPostById`, `getUserByUsername`, `getCommentsForPost` |
+| `app/page.tsx` | лента (`/`) |
+| `app/u/[username]/page.tsx` + `not-found.tsx` | дневник пользователя |
+| `app/u/[username]/[slug]/page.tsx` + `not-found.tsx` | отдельный пост |
+| `components/PostCard.tsx` | карточка поста (лента + дневник); принимает `currentUserId?` — ссылка "Редактировать" видна только автору |
+| `components/TrackRow.tsx` | строка трека (пикер, карточка, страница поста) |
+
+**Комментарии (только на странице поста, `/u/[username]/[slug]`)**
+| Файл | Что там |
+|---|---|
+| `lib/comment-schema.ts` | `commentInputSchema`/`CommentInput` — текст 1–1000 символов |
+| `app/u/[username]/[slug]/actions.ts` | `createComment(postId, text)` и `deleteComment(formData)` Server Actions; владение проверяется по автору *комментария*, не поста — модерация чужих комментариев автором поста не реализована (сознательно вне скоупа) |
+| `components/CommentForm.tsx` | контролируемая textarea + `useTransition` (не `<form action>`, чтобы после успешной отправки можно было программно очистить поле) |
+| `components/CommentList.tsx` | серверный компонент, кнопка "Удалить" рендерится только когда `comment.authorId === currentUserId`; сам delete — zero-JS `<form action={deleteComment}>` на каждый комментарий |
+
+**Лайки (видны и кликабельны в трёх местах: лента, дневник, страница поста)**
+| Файл | Что там |
+|---|---|
+| `lib/like-actions.ts` | `toggleLike(postId, authorUsername, slug)` Server Action — не в `app/.../actions.ts` одного роута, т.к. вызывается из трёх разных страниц; `findUnique` по составному `postId_userId` → `create`/`delete`; `revalidatePath` для `/`, `/u/[username]` и `/u/[username]/[slug]` разом |
+| `components/LikeButton.tsx` | client component, импортирует `toggleLike` напрямую (без прокидывания action-пропом — нет единого роута-владельца); React 19 `useOptimistic` + `useTransition` для мгновенного отклика без ручного отката при ошибке |
+| `lib/posts.ts` | `_count: { select: { likes: true } }` в общем `postWithDetails` include — счётчик долетает сразу до всех read-функций; отдельный `getLikedPostIds(userId, postIds)` — batch-проверка "лайкнул ли лично я", не кешируется вместе с постом (зависит от зрителя, как и `isOwner`) |
+
+**Подписки (кнопка только на `/u/[username]`, лента на `/following`)**
+| Файл | Что там |
+|---|---|
+| `app/u/[username]/actions.ts` | `toggleFollow(targetUsername)` Server Action — в отличие от `toggleLike`, живёт в `actions.ts` конкретного роута, а не в общем `lib/`, т.к. кнопка подписки есть только на одной странице (дневник автора), не в трёх местах, как у лайка. Гард на self-follow — на уровне экшена (`targetId === session.user.id`), не только скрытием кнопки в UI; `revalidatePath` для `/u/[username]` и `/following` |
+| `components/FollowButton.tsx` | client component, `useOptimistic` + `useTransition` — та же формула дельты счётчика, что и в `LikeButton` (баг с двойным счётом, пойманный на лайках, здесь сразу учтён) |
+| `app/following/page.tsx` | персональная лента: `redirect("/login")` для анонимусов (по образцу `/new`), `getFollowingFeedPosts` + `getLikedPostIds`, отдельный текст пустого состояния (не путать с пустой глобальной лентой) |
+| `lib/posts.ts` | `_count: { select: { followers: true, following: true } }` в `getUserByUsername`; `isFollowing(followerId, followingId)` — по образцу `getLikedPostIds`, но для одной пары; `getFollowingFeedPosts(userId)` — `postWithDetails` с `where: author.followers.some.followerId = userId` |
+| `components/SessionStatus.tsx` | ссылка "Моя лента" на `/following` в залогиненном блоке |
+
+**Друзья (взаимные, кнопка на `/u/[username]`, публичный список `/u/[username]/friends`, приватный хаб `/friends`)** — сосуществует с подписками, не замена: у `Follow` нет подтверждения, у дружбы есть заявка + принятие
+| Файл | Что там |
+|---|---|
+| `prisma/schema.prisma` | `FriendRequest` (заявка, `senderId`/`receiverId`) и `Friendship` (уже состоявшаяся дружба) — две отдельные модели, не расширение `Follow`: связь взаимная, с промежуточным состоянием заявки, `Follow` под это не подходит. В `Friendship` всегда `userAId < userBId` (обычное сравнение строк) — один ряд на пару, а не «кто кого»; инвариант держится только в коде (`normalizePair`), в БД никак не проверяется. `FriendRequest.ignoredAt DateTime?` — «Позже» (см. подсекцию про тост): дата, а не boolean, чтобы позже можно было сделать авто-возврат через N дней |
+| `lib/friends.ts` | `normalizePair(a, b)` — единственное место, которое решает порядок пары; `getFriendshipStatus(myId, targetId)` → `"none" \| "friends" \| "pending_outgoing" \| "pending_incoming"` для кнопки; `getFriends`, `getIncomingFriendRequests` (только `ignoredAt: null`), `getDeferredFriendRequests` (только отложенные), `getOutgoingFriendRequests`. `getFriendshipStatus` про `ignoredAt` **не знает намеренно** — на профиле отправителя отложенная заявка выглядит как обычная входящая, «Позже» глушит счётчики, а не саму заявку |
+| `lib/friend-actions.ts` | мутации — в `lib/`, а не в `actions.ts` одного роута, т.к. дергаются минимум с трёх мест (кнопка на дневнике, входящие/исходящие в хабе), та же причина, что у `lib/like-actions.ts`. `sendFriendRequest` — если у адресата уже есть встречная заявка к отправителю, это не второй `FriendRequest`, а сразу `$transaction`(удалить встречную заявку + создать `Friendship`) — без этого заявки от A и B друг к другу зависли бы обе, и никто явно не жал "Принять". Везде `revalidatePath` для обеих сторон (`/u/[username]` × 2, `/u/[username]/friends` × 2, `/friends`) — шире, чем у `toggleFollow`, которая ревалидирует только целевого пользователя. `ignoreFriendRequest` — `updateMany`, а не `update`: повторный клик по уже отложенной (или отменённой отправителем) заявке штатен, `update` кинул бы исключение на ноль строк. **Заявка живёт в двух направлениях сразу** (A и B нажали «Добавить» одновременно → оба прочитали пустую встречную и оба создали свою), поэтому всё, что закрывает вопрос дружбы, чистит обе стороны через хелпер `pairRequests` — и `acceptFriendRequest`, и ветка автопринятия в `sendFriendRequest`. Иначе пережившая строка становится вечной входящей от уже состоявшегося друга: «Принять» по ней падает об unique на `Friendship`, а счётчик в шапке залипает намертво (выход только «Отклонить», до чего надо догадаться). Плата за `deleteMany` — от двойного принятия защищает только unique на `Friendship`, и это осознанный размен. У `sendFriendRequest` есть гард «уже друзья» (`friendship.findUnique` до всего остального) — экшен это публичный POST-эндпоинт, и прямой вызов при существующей дружбе создавал бы ту же фантомную заявку; возвращает `status: "friends"`, а не `error`, иначе `useOptimistic` в `FriendButton` откатил бы кнопку в «Добавить в друзья». `cancelFriendRequest`/`declineFriendRequest` — тоже `deleteMany`, но **по одному направлению**: отмена своей исходящей не должна заодно стирать входящую от того же человека, это разные действия |
+| `components/FriendButton.tsx` | client, по образцу `FollowButton`, но состояние не boolean, а 4 варианта; `pending_incoming` рендерит сразу две кнопки (Принять/Отклонить) вместо одной. После каждого действия зовёт `refresh()` из `useNotifications()` — иначе цифра в шапке не сдвинется |
+| `components/IncomingRequestRow.tsx`, `components/OutgoingRequestRow.tsx` | строки для `/friends`: аватар+имя кликабельны отдельной `<Link>`, кнопки действия — рядом, не внутри неё (`<button>` внутри `<a>` — невалидная вложенность). `UserResultRow` тут не подошёл: он сам целиком `<Link>`, кнопку действия внутрь не вставить. У `IncomingRequestRow` третья кнопка «Позже» и проп `deferred` — в секции отложенных её не рендерим, остальные две работают как обычно |
+| `app/u/[username]/friends/page.tsx` | публичный список друзей, по образцу `/u/[username]/page.tsx` (back-link, тот же shell). **Занимает статический сегмент `friends` на одном уровне с `[slug]`** — пост с slug `"friends"` у этого автора станет недостижим по `/u/[username]/friends` (статический маршрут в Next.js всегда выигрывает у динамического); осознанный компромисс, не баг |
+| `app/friends/page.tsx` | приватный хаб, по образцу `/following/page.tsx` (`redirect("/login")` без сессии): четыре секции — входящие заявки, отложенные, исходящие, список друзей. Отложенные обязаны быть видимы: иначе принять такую заявку потом неоткуда |
+| `app/u/[username]/page.tsx` | `<FriendButton>` рядом с `<FollowButton>`; счётчик "N друзей" = `_count.friendshipsA + _count.friendshipsB` (Prisma не умеет посчитать одной парой при self-relation с двумя сторонами), кликабелен → `/u/[username]/friends` |
+| `lib/posts.ts` | `_count` в `getUserByUsername` донабрал `friendshipsA`/`friendshipsB` |
+| `components/SessionStatus.tsx` | ссылка "Друзья" → `/friends`, рядом с "Моя лента"; счётчик "Друзья (N)" берёт из `useNotifications()` |
+
+**Клиентские уведомления: счётчики в шапке (заявки в друзья + непрочитанные сообщения), тост-напоминание про заявки, кнопка «Позже» на `/friends`**
+| Файл | Что там |
+|---|---|
+| `lib/notifications.ts` | `getNotices()` — **читающий** Server Action (не route handler: своих route-хендлеров в проекте нет, кроме catch-all Better Auth и двух RSS-фидов). Параметров нет намеренно — получатель всегда владелец сессии, подставить чужой `userId` снаружи нечем, а `"use server"`-функция это публичный POST-эндпоинт. Возвращает `{ friendRequests, unreadMessages }` **одним запросом на оба уведомления**: провайдер зовёт их всегда вместе, и сессия читается один раз. Заявки считает только `ignoredAt: null`; сборка `FriendRequestNotice` живёт в невыэкспортированном `readFriendRequestNotice` — наружу из `"use server"` разрешены только async-функции, внутренние хелперы можно любые. Экспорт `interface` из такого файла Next пропускает (типы стираются) — проверено на живом дев-сервере, `tsc` это не ловит |
+| `components/NotificationsProvider.tsx` | client-контекст + хук `useNotifications()` → `{ friendRequests, unreadMessages, announcement, lastPingAt, refresh }`, обёрнут вокруг всего в `app/layout.tsx`. Был `FriendRequestsProvider`, обобщён под сообщения — второго провайдера сознательно не заводили: он дублировал бы ту же машинерию (сессия, счётчик гонок, `visibilitychange`). **Зачем провайдер, а не запрос внутри `SessionStatus`:** `revalidatePath` из экшена перерисовывает только серверные страницы, до клиентской шапки в layout'е не дотягивается — цифра после «Принять» замерла бы до полной перезагрузки, поэтому мутации явно зовут `refresh()`. Перечитывает при монтировании, смене `usePathname()`, `visibilitychange` и по Realtime-пингу; **поллинга нет намеренно** — у сообщений вместо него пинг, у заявок ценой этого новая заявка замечается при первой навигации или возврате во вкладку. Внутри `refresh` — счётчик гонок через `useRef` и `.catch(() => {})`: напоминалка второстепенна, упавший запрос молчит. Здесь же единственная Realtime-подписка вкладки (детали — в секции про личные сообщения): одна подписка двигает и цифру в шапке, и открытый диалог. Сессия через `authClient.useSession()`, а не `auth.api.getSession()` в layout — та же причина, что у `SessionStatus` |
+| `components/FriendRequestToast.tsx` | client, чисто презентационный: рисует `announcement` и умеет закрыться, авто-скрытие 12 с. «Закрыт» хранится как сам объект напоминания, а не boolean — следующее напоминание это новый объект, оно не окажется закрытым по инерции. Про подписки тост молчит сознательно: `Follow` мгновенный, «заявки на подписку» в проекте не существует |
+| — политика показа | Живёт в провайдере (`shouldAnnounce`), а не в тосте: решение зависит от момента прихода свежих данных, и принимать его в колбэке запроса правильнее, чем в эффекте на уже разложенный по state результат — плюс правило `react-hooks/set-state-in-effect` (ESLint падает на синхронном `setState` в теле эффекта, это не придирка, а каскадный ререндер). Два **независимых** повода, достаточно любого: пришла заявка свежее той, о которой уже сообщали, **или** с прошлого показа прошёл час. Ключ `music-diary:friend-toast:<userId>` (с `userId`, чтобы два аккаунта в одном браузере не глушили тост друг другу) хранит `{ shownAt, lastCreatedAt }`; читается терпимо — мусор и голое число из первой версии дают нули. **Сравнение по дате, а не по `id`:** если заявок две и свежую отложили «Позже», самой свежей становится старая, её дата меньше сохранённой и тост не выстрелит сразу после нажатия; с `id` было бы «не равно» → мгновенный повтор |
+| `app/layout.tsx` | `<NotificationsProvider>` оборачивает `<Header />`, `{children}` и `<FriendRequestToast />`. Клиентский провайдер вокруг серверных потомков — нормально: они приходят пропсом `children`, а не импортируются внутрь клиентского модуля |
+
+**Личные сообщения (список `/messages`, диалог `/messages/[username]`)** — право переписки даёт только взаимная дружба, подписки его не дают
+| Файл | Что там |
+|---|---|
+| `prisma/schema.prisma` | `Conversation` — структурная копия `Friendship` (одна строка на пару, порядок через тот же `normalizePair`), `Message` — структурная копия `Comment` (только `conversationId` вместо `postId`). Денормализованный `lastMessageAt` на диалоге — ради сортировки «свежие сверху» без подзапроса за последним сообщением каждого диалога. **«Прочитано» — метка `userALastReadAt`/`userBLastReadAt` на диалоге, а не флаг на каждом сообщении:** открытие чата с 200 сообщениями это один `update`, а не 200. `null` = «ни разу не открывал», непрочитано всё |
+| `lib/message-schema.ts` | `messageInputSchema` — текст 1–2000 символов, по образцу `lib/comment-schema.ts` |
+| `lib/messages.ts` | query-слой: `getConversationList` (include обоих юзеров + `messages: { take: 1 }`, собеседник выбирается тем же приёмом, что в `getFriends`), `getConversationWith` (может вернуть `null` — диалог создаётся лениво, при первой отправке), `getMessages`, `getUnreadCount`. **`getUnreadCount` — два запроса намеренно:** моя метка чтения лежит в `Conversation`, а сравнивать её надо с `Message.createdAt`, и Prisma не умеет сопоставить поле модели с полем связанной модели одним `where`. Станет медленно — денормализовать счётчик на диалоге или raw SQL; для личного проекта преждевременно. Бейдж в списке булевый (`hasUnread`), а не число: точное количество на диалог стоило бы отдельного запроса на строку |
+| `lib/message-actions.ts` | `sendMessage(targetUsername, text)` и `markConversationRead(otherUsername)` — в `lib/`, а не в `actions.ts` роута (зовутся минимум с трёх мест), та же причина, что у `lib/friend-actions.ts`. **Гард дружбы — внутри экшена**, а не сокрытием кнопки: `"use server"` это публичный POST-эндпоинт. `conversation.upsert` + `message.create` в одной `$transaction`; своя метка чтения двигается вместе с отправкой — своё сообщение прочитано мной сразу. `notifyUser` — строго **после** транзакции и в `try/catch`: сообщение уже в базе, и упавший звонок не должен превращать успешную отправку в ошибку. `markConversationRead` — `updateMany`, а не `update`: ноль строк (диалога ещё нет) штатный исход, как в `ignoreFriendRequest`. Ревалидируются **оба** адреса диалога: у меня он `/messages/<он>`, у него — `/messages/<я>` |
+| `lib/realtime.ts` | `notifyUser(userId)` (сервер) — `channel.httpSend(PING_EVENT, {})` со `service_role`-ключом. `httpSend`, а не `send()`: у `send()` неявный HTTP-фолбэк объявлен устаревшим (печатает warning), а `httpSend` — честный POST и не поднимает WebSocket ради одного пинга. Без переменных окружения тихо ничего не делает |
+| `lib/realtime-channel.ts` | общий словарь сервера и браузера (`userChannelTopic`, `PING_EVENT`). **Файл намеренно без единого импорта:** его тянет клиентский код, и через любой импорт сюда могла бы приехать `lib/supabase.ts` со `service_role`-ключом, то есть админский ключ в браузерном бандле |
+| `lib/supabase-browser.ts` | ленивый синглтон на `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`; возвращает `null`, если их нет — живая доставка это украшение, без ключей всё работает, просто сообщения приезжают при первой навигации |
+| `components/RefreshOnPing.tsx`, `components/MarkReadOnOpen.tsx` | два клиентских «нерва», по одной обязанности каждый: первый на изменение `lastPingAt` зовёт `router.refresh()` (перезапрос серверной страницы обычным путём, с сессионной кукой), второй — `markConversationRead` при монтировании и на каждом пинге. Разделены, чтобы список диалогов брал только первый, а чат — оба, без опциональных пропов-переключателей. Отметка «прочитано» именно эффектом, а не при рендере страницы: серверный компонент во время рендера мутировать данные не может (`revalidatePath` посреди рендера Next запрещает) |
+| `components/MessageForm.tsx` | контролируемая textarea + `useTransition` (не `<form action>`): после отправки поле надо очистить программно — тот же довод, что в `CommentForm`. Экшен импортируется напрямую из `lib/`, как в `FriendButton` |
+| `components/MessageList.tsx`, `components/ConversationRow.tsx` | презентационные серверные компоненты со своим минимальным типом пропов (как `UserResultRow`). Аватара у пузырей нет — в диалоге на двоих сторону задаёт выравнивание; обрезка превью в строке диалога — CSS-ом (`truncate`), а не `slice` по строке |
+| `app/messages/page.tsx` | список диалогов, по образцу `app/friends/page.tsx` (`redirect("/login")`, тот же shell). Пустых диалогов в списке не бывает — они создаются лениво |
+| `app/messages/[username]/page.tsx` | диалог. **Маршрут по `username`, а не по `conversationId`:** ссылку с профиля тогда можно собрать без похода в базу, а самого диалога может ещё не существовать. Не друг или сам себе → `notFound()`; тот же гард продублирован в `sendMessage` |
+| `app/u/[username]/page.tsx` | кнопка «Написать» рядом с `FollowButton`/`FriendButton`, только при `friendshipStatus === "friends"` |
+| `components/SessionStatus.tsx` | ссылка «Сообщения (N)» рядом с «Друзья»; `N` — `unreadMessages` из `useNotifications()` |
+| — Realtime как «звонок, а не транспорт» | **Находка сессии: Realtime ничего не знает про Better Auth.** Приватные каналы авторизуются RLS-политиками на `realtime.messages`, которые читают claims из Supabase-JWT; сессия у нас в Better Auth, и для Supabase наш юзер анонимус (`auth.uid()` = `null`). Официальный Third-Party Auth требует публично достижимого OIDC/JWKS (на `localhost:3000` Supabase не достучится, нужен туннель) и first-class поддерживает только Clerk/Auth0/Firebase/Cognito/WorkOS — Better Auth в списке нет. Обход: канал **публичный** (`user:<userId>`) и везёт **пустой payload** — ни текста, ни отправителя; получив пинг, браузер идёт за содержимым обычным путём, авторизованным сессионной кукой. **Цена, осознанная:** знающий чужой `userId` (32 случайных символа, в UI не светится) видит факт и время прихода сообщения, но не текст и не отправителя |
+| — ручные шаги вне кода | `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY` в `.env.local` (префикс обязателен — переменная нужна в браузере) + в Supabase → Realtime Settings публичный доступ к каналам не должен быть отключён. Без них код исправен, спит только живая доставка |
+
+**Статистика профиля (блок на `/u/[username]`, под карточкой автора)**
+| Файл | Что там |
+|---|---|
+| `lib/stats.ts` | `getProfileStats(userId)` — постов, лайков получено, уникальных треков, топ-3 артиста. Отдельный файл, не расширение `getUserByUsername`: ту функцию зовёт ещё и `/settings`, которому статистика не нужна. Топ-артисты считаются в JS (`postTrack.findMany` + `Map`), не через Prisma `groupBy` — `groupBy` не умеет группировать по полю связанной модели (`Track.artist` при группировке `PostTrack`); для масштаба личного дневника нормально, при росте — переходить на raw SQL с `GROUP BY` (второе место с raw SQL после `lib/search.ts`). Плюс `getSiteStats()` — `post.count()` + `user.count({ where: { posts: { some: {} } } })` для счётчика на первом экране; рядом с `getProfileStats`, а не в `lib/posts.ts` (там query-слой ленты, тут счётная логика), уходит в тот же `Promise.all` в `app/page.tsx`, что сессия и лента |
+| `components/ProfileStats.tsx` | серверный презентационный компонент, свой минимальный тип пропов (по образцу `UserResultRow`). Подписи в форме "Записей: N", не "N записей" — русская плюрализация существительных требует трёх ветвей согласования, а числу-счётчику это не нужно. Топ-артисты не рендерятся, если список пуст |
+| `lib/posts.ts` | `createdAt: true` добавлено в select `getUserByUsername` — только ради "Ведёт дневник с …", раньше не выбиралось |
+
+**Сквозной поиск (строка в шапке на всех страницах, результаты на `/search`)** — про сам движок и грабли см. раздел "Поиск по сайту"
+| Файл | Что там |
+|---|---|
+| `prisma/migrations/20260811160308_add_fulltext_search_indexes/migration.sql` | первая написанная руками (не сгенерированная) миграция в проекте — три GIN expression-индекса. Без `CONCURRENTLY`: Prisma гоняет миграции в транзакции, а `CREATE INDEX CONCURRENTLY` вне транзакции работать не может |
+| `lib/search.ts` | `searchPosts`/`searchTracks`/`searchUsers`, лимит `SEARCH_RESULT_LIMIT = 10` на категорию. Единственное место в проекте с raw SQL, и намеренно двухфазное: `$queryRaw` достаёт **только `id`** в порядке `ts_rank`, дальше обычная гидратация через Prisma (нужны `include` с автором/треками/`_count`, плоские строки из raw SQL не годятся) + ручная ресортировка `reorderByIds` — `where: { id: { in: ids } }` порядок не гарантирует. Только тегированный темплейт `$queryRaw`, **никогда `$queryRawUnsafe`** с конкатенацией: параметры уходят отдельно от текста запроса. Тип `$queryRaw<T>` компилятор проверить не может — это обещание, а не проверка, поэтому raw SQL держим минимальным и в одном файле |
+| `lib/posts.ts` | `getPostsByIds(ids)` — та же `postWithDetails`-подгрузка, но `findMany({ where: { id: { in: ids } } })` и **без `orderBy`**: порядок задаёт ранжирование в `lib/search.ts` |
+| `app/search/page.tsx` | публичный роут (сессия читается только ради `getLikedPostIds`, редиректа нет). `searchParams` — промис. Гард `< 2` символов → подсказка без запроса к БД. Три поиска через `Promise.all` (независимы). Пустая секция не рендерится; пусто везде → "Ничего не найдено". `PageShell`/`Section`/`EmptyState` — локальные неэкспортируемые компоненты этого файла (нужны в обеих ветках вывода, но никому снаружи) |
+| `components/SearchDialog.tsx` | кнопка-лупа в шапке + модалка (`<dialog>` + `showModal()`, по образцу `TrackPickerDialog`). Была постоянно висящая строка `SearchBar` — поиск занимал середину шапки, не заслуживая столько внимания. **Кнопка осталась настоящей `<Link href="/search">`**, а JS перехватывает клик `preventDefault()` — без JS клик просто уводит на страницу поиска, которая самодостаточна; это тот же progressive enhancement, что раньше давал `next/form`. Внутри модалки `next/form` сохранён, сабмит уходит на `/search?q=`. Ctrl/⌘+K — глобальный слушатель `keydown` на `window`. Живой выдачи в модалке нет: `/search` уже отдаёт всё три категории, а инкрементальный поиск потребовал бы отдельного Server Action поверх `lib/search.ts` |
+| `components/UserResultRow.tsx` | строка результата-пользователя по образцу `TrackRow`: свой минимальный интерфейс пропов вместо импорта модели Prisma. Для постов и треков переиспользуются `PostCard`/`TrackRow` как есть |
+| `components/Header.tsx` | липкая шапка (`sticky` + `backdrop-blur`), логотип антиквой с крутящейся пластинкой на ховере; справа группа `<SearchDialog />` + `<SessionStatus />`. Логотипу нужен `shrink-0` — иначе флекс его сжимает |
+
+**RSS-фиды (`/rss.xml` — общая лента, `/u/[username]/rss.xml` — дневник автора)**
+| Файл | Что там |
+|---|---|
+| `lib/rss.ts` | `renderFeed`, `escapeXml`, `deriveTitle`, `RSS_ITEM_LIMIT = 20`. Заголовки поста **генерируются на лету, не хранятся** (сознательное решение — `Post.title` не добавлялся, миграции в этой задаче нет): первая непустая строка `text`, обрезанная по границе слова (~80 симв) с `…`; если текста нет вовсе (пост «только трек» — штатный случай) — `Артист — Название` первого трека; если и трека нет — `"Запись"`. `escapeXml` экранирует `& < > " '`, порядок важен — `&` первым, иначе задвоится на уже экранированных `&lt;`/`&gt;`. Даты — `createdAt.toUTCString()` (RFC-1123), не `toISOString()` — часть читалок ISO не разберёт |
+| `app/rss.xml/route.ts`, `app/u/[username]/rss.xml/route.ts` | **первые собственные route handlers в проекте** (до этого — только catch-all Better Auth): Server Action нельзя открыть в браузере, у него нет постоянного URL и нельзя выставить `Content-Type`. `Content-Type: application/rss+xml; charset=utf-8` руками в `Response`. Origin — из `new URL(request.url).origin`, ноль конфига. Неизвестный `username` → `new Response("Not found", { status: 404 })`. `getPostsByUsername()` отдаёt все посты автора без лимита (её зовёт страница дневника) — резать до `RSS_ITEM_LIMIT` в `lib/rss.ts`, не в query-функции. **Тот же осознанный компромисс, что и у `friends`:** `app/u/[username]/rss.xml/` — статический сегмент на одном уровне с `[slug]`, пост со слагом `rss.xml` у этого автора станет недостижим |
+| `app/layout.tsx`, `app/u/[username]/page.tsx` | `alternates.types` в `metadata`/`generateMetadata` — это то, по чему читалка находит фид по голому адресу сайта (`<link rel="alternate" type="application/rss+xml">` в `<head>`). **Расхождение с доками Next, проверено `next build`:** относительный `href` (`/rss.xml`) в `alternates.types` **не даёт build error** без `metadataBase`, вопреки формулировке в `generate-metadata.md` — не заводили `metadataBase`/лишнюю env-переменную. `generateMetadata` на `/u/[username]` дергает `getUserByUsername` второй раз (страница и так его читает) — сознательно не оборачивали в React `cache()`, лишний indexed-lookup для первой версии фичи не стоит того. Плюс видимая ссылка «RSS» рядом с `@username` на дневнике |
+
+## Дизайн-система «тёплый зин»
+
+До боилерплейта Next было два токена (`--background`/`--foreground`), цвета руками
+в разметке, `Arial` в `body`. Направление — тёплый зин (кремовая бумага, тёплый
+чёрный, один акцент-терракота, текст записей антиквой), выбрано разработчиком
+из трёх предложенных.
+
+**Правила:**
+
+- **Ни одного `dark:` в разметке.** Цвета — переменные в `:root`, переопределяются
+  в `@media (prefers-color-scheme: dark)`, `@theme inline` раздаёт утилиты
+  (`bg-surface`, `text-muted`, `border-line`). Компонент пишет один класс, тёмная
+  тема получается сама.
+- **Переключатель темы есть** (`components/ThemeToggle.tsx`) — три состояния «как
+  в системе / светлая / тёмная», по умолчанию системная, `data-theme` на `<html>`
+  тогда отсутствует вовсе. Детали устройства — секция «Переключатель темы» ниже.
+- **`subsets: ["latin"]` не грузит кириллицу** — при добавлении шрифта проверять
+  `subsets`, иначе русский текст уезжает в системный фолбэк.
+- **`.prose-diary`** — единственный «типографский» класс, для текста записей
+  (Literata). Интерфейс — Geist, антиква только там, где читают.
+- **`lib/artwork.ts`** — обложки в базе 100×100 (`artworkUrl100` от iTunes), апскейл
+  для крупного героя — подмена размера прямо в URL, без похода в API. Адреса Cover
+  Art Archive (MusicBrainz) под регулярку не попадают, возвращаются как есть.
+- **`PostCard` строит карточку вокруг первого трека** — его обложка герой слева,
+  все дорожки записи (включая первую) списком (`PostTrackList`) ниже — с обложки
+  запись играет с начала, с любой строки — с этого места. Пост без текста
+  центрируется по обложке.
+- **Перекраска шла заходами, каждый проверялся глазами целиком**: пилот (шапка,
+  лента, общие атомы) → экраны состояний → страница записи и дневник автора →
+  пишущий путь → личные экраны → мобильная шапка → вход/регистрация/настройки →
+  поиск → хвост мелочей (поле тетради, манифест, плеер) → переключатель темы →
+  дата на полях. Все страницы сайта сейчас на новых токенах — проверить грепом
+  `dark:|bg-white|text-zinc-|border-black/\[\.08\]` (должен молчать).
+
+### Фирменный знак «Линия»
+
+Один опознаваемый штрих на весь сайт: ровная нить → короткий затухающий всплеск
+→ снова нить (тишина, песня, тишина — как одна запись дневника).
+
+| Файл | Что там |
+|---|---|
+| `components/Waveline.tsx` | client (читает `usePreviewPlayer()` — дышит везде, где играет превью). Две геометрии в `SHAPES`: `full` (96×28) и `micro` (28×16, сейчас нигде не используется, оставлена про запас). Три отдельных `<path>` — нити тоньше и цветом `--line`, всплеск толще и `currentColor`, масштабируется анимацией отдельно от нити. Шаг между пиками 4.5 единицы (теснее — слипается в кляксу на реальном размере) |
+| `components/Groove.tsx` | разделитель на том же знаке. `size` (`md`/`sm`), `tone="quiet"` (в ленте знаков много, полный акцент кричал бы), `silent` (ровная нить без всплеска — «здесь тихо») |
+| `app/icon.svg` | иконка вкладки, заменила `favicon.ico`. Всплеск нарисован отдельно, крупнее — на 16 px знак-строка превратился бы в чёрточку |
+| `components/Header.tsx`, `app/globals.css` | знак вместо винила в шапке. `.waveline__burst` — прорисовка через `stroke-dashoffset` (база `0`, анимация `from: 110` — порядок важен, иначе перебивается `.waveline--live`) |
+
+**Словарь состояний** — тишина (`Groove silent`) · песня (`waveline--live`) ·
+письмо (`waveline--writing`, `app/loading.tsx`) · обрыв (`variant="broken"`,
+`app/error.tsx`/`not-found.tsx`). `broken` — не «всплеск наоборот», а зеркальный
+разрыв нити, и не дышит под играющее превью.
+
+**Грабля: `calc()` с `var()` внутри `@keyframes` не интерполируется** — браузер
+резолвит `var()` поздно, `calc()` с ней переключается на дискретную анимацию
+(видимые скачки вместо хода). Лечится второй переменной, отданной уже готовым
+числом (`--stroke-len-neg`), а не `calc(var(...) * -1)` в самом keyframe.
+Симптом обманчив: `getComputedStyle` показывает `playState: running`, просто
+ступенькой.
+
+`prefers-reduced-motion`: `animation: none` обязано идти в паре с явным
+`opacity: 1` — иначе выключенная анимация оставляет базовый `opacity: 0` и
+элемент пропадает.
+
+**Где встречается — ровно три роли**: логотип в шапке, разделитель под записью
+через одну (`showMark={index % 2 === 0}` — решает список, не карточка, чтобы
+пропущенная получала `Groove silent`, а не пустоту), конец ленты. Плюс иконка
+вкладки.
+
+**История решения важнее списка.** Первый заход раскидал знак по десяти местам
+(~27 вхождений на одной странице) — разработчик свернул это одной фразой: «не
+должно быть чересчур попсовым». Знак работает потому, что он один — **не
+размножать обратно**, оценивать новые идеи со знаком вычитанием, а не сложением.
+
+**Линовка страницы** (`body::before`) — тетрадный лист, повторяющийся градиент
+без ассета, видна только в полях (карточки непрозрачны). Токен `--rule`.
+Вертикальное поле (`html::before`) — токен `--rule-margin`, привязано к колонке
+контента (`calc(50% - 34rem)`), включается с `72rem`.
+
+**Общая инфраструктура дизайн-системы:** `lib/prisma.ts` (синглтон), `lib/supabase.ts`
+(Storage, только из Server Actions), `lib/format-date.ts`, `lib/ui.ts` (кнопки-«таблетки»
+`pillButton`/`pillButtonActive`/`pillButtonPrimary`, поле `field`, `submitButton` —
+голые константы без импортов, годятся и серверным, и клиентским компонентам).
+
+### Страница записи, дневник автора, список друзей
+
+`app/u/[username]/[slug]/page.tsx` — обложка героя 176 px (в ленте 128). Back-link
+ведёт в дневник автора, а не на главную (естественный родитель записи). Знак на
+странице стоит ровно один раз — `<Groove>` между записью и комментариями.
+`CommentList`/`CommentForm` — комментарий как маленькая карточка тоном тише
+записи, ошибки — токен `text-danger` (заведён здесь, красный заметно ярче
+терракоты, чтобы не читаться акцентом).
+
+`app/u/[username]/page.tsx` — шапка автора не карточка, а титульный лист (карточки
+на странице принадлежат записям). `ProfileStats.tsx` — колофон: подпись сверху,
+число снизу (обход русской плюрализации: «12 Записей» потребовало бы трёх ветвей
+согласования). `FollowButton`/`FriendButton` рендерятся только на дневнике.
+`UserResultRow` переиспользуется на `/friends` и `/search`. bio — антиквой, но
+не `.prose-diary` (тот закреплён за текстом записей).
+
+**Грабля CSS:** `.glow-card::before` — маска свечения обязана быть
+`radial-gradient(circle closest-side, …)`, а не линейной по горизонтали, иначе
+на крупной карточке свечение обрывается видимой прямой границей.
+
+### Пишущий путь `/new` и `/post/[id]/edit`
+
+Коробки вокруг формы нет — заголовок антиквой прямо на бумаге, карточка только
+там, на чём пишут. Back-link с `/new` — на главную, с редактирования — в саму
+запись. `PostForm.tsx`: поле записи `.prose-diary` (пишешь тем же шрифтом, каким
+потом читают) — перебивает `text-sm` из `field` намеренно (правила `globals.css`
+вне Tailwind-слоёв, поэтому сильнее утилит). `TrackPickerDialog.tsx` — идиома
+`<dialog>` как у `SearchDialog`. `lib/ui.ts` добрал `field`/`submitButton`
+(`pillButtonPrimary` не годится по размеру — Tailwind решает порядок `h-9`/`h-11`
+сам, дописать нельзя). Знака на обоих экранах нет — форма не то, что читают.
+
+### Личные экраны `/friends`, `/messages/*`, `/following`
+
+`MessageList.tsx` — свой пузырь лёгкой заливкой (`bg-accent-wash` +
+`border-accent/25`), не сплошной терракотой: сообщений на экране десятки, сторону
+и так задаёт выравнивание. Классы вынесены в `bubbleBase`/`bubbleMine`/`bubbleTheirs`.
+`IncomingRequestRow`/`OutgoingRequestRow` — `flex-wrap` на 390 px, ховер только на
+имени (строка целиком не ссылка). Кнопки из `lib/ui.ts`: «Принять» —
+`pillButtonPrimary`, «Отклонить»/«Позже» — обычный `pillButton` (в паре залито
+ровно одно, главное). `app/friends/page.tsx` — подписи секций тихими капсами, не
+`h2` (секций до четырёх подряд). `app/following/page.tsx` — то же чередование
+знака и закрывающий `<Groove>`, что на главной. `ConversationRow.tsx` — форма и
+ховер как у `UserResultRow`; бейдж непрочитанного — `bg-accent`.
+
+Пустые состояния на всех четырёх экранах — один вид: рамка пунктиром, строка
+антиквой `font-serif text-lg`, пояснение `text-sm text-muted`.
+
+**Грабля тестирования:** заявки в друзья односторонни — `IncomingRequestRow`
+виден только у получателя, `OutgoingRequestRow` только у отправителя; скриншоты
+снимать с двух аккаунтов. Логин через Better Auth на прод-сборке иногда не
+укладывается в 30 с (Supabase через pooler) — таймаут пошире и ретраи.
+
+### Мобильная шапка: разделы под кнопкой меню
+
+Баг вёрстки, не перекраска: у залогиненного шапка переполнялась по горизонтали —
+семь элементов подряд не влезали на узких экранах. Подход — меню-панель
+(`components/MobileMenu.tsx`, третье применение идиомы `<dialog>` после
+`SearchDialog`/`TrackPickerDialog`). Компонент презентационный — пропсы
+`username`/`requestCount`/`unreadMessages`, сессия читается только в
+`SessionStatus.tsx`. Клик по ссылке закрывает панель обработчиком на контейнере
+(`closest("a")`), не колбэком на каждой ссылке. Точка на кнопке меню — не число,
+а сигнал «загляни» при `requestCount + unreadMessages > 0`, тот же `bg-accent`,
+что у бейджа непрочитанного. Порог переключения на панель — `lg` (не `sm`):
+на 640-1023 px ряд разделов всё ещё не помещался с первой правкой, подняли порог
+и заодно `max-w-28 xl:max-w-36` на длинное имя пользователя (мерить ширину — на
+предельно длинном имени, `truncate` всё равно занимает свой максимум).
+
+Знак на кнопке меню не рисуется — у него уже три роли, четвёртая сделала бы узор.
+
+**Грабля Playwright, логин:** клик по «Войти» до гидратации — React ещё не навесил
+`onSubmit`, форма молча не отправляется (симптом неотличим от неверного пароля).
+Лечится `waitUntil: "networkidle"` + пауза перед `fill()`.
+
+### Вход, регистрация, настройки
+
+`/login`, `/signup`: коробки вокруг формы нет — единственные экраны для
+незалогиненного, белая карточка на кремовой бумаге читалась бы бланком.
+`/settings`: рамка убрана, блоки разделяет волосяная линия, добавлен подзаголовок.
+`SettingsForm.tsx` — «Сохранено» красится `text-accent` (не заводить второй акцент
+ради одной строки). `AvatarUploadForm.tsx` — «Выбрать фото» контурный, не залитый
+(залитая кнопка на экране должна быть одна — «Сохранить»); «Удалить фото» —
+`text-danger`. Знака нет ни на одном из трёх экранов.
+
+### Поиск
+
+`app/search/page.tsx`, один файл — три локальных компонента (`PageShell`/`Section`/
+`EmptyState`) и есть вся вёрстка. Запрос — подпись под заголовком, не в самом
+заголовке (иначе он менял длину на каждый ввод). Подписи секций — тихими капсами,
+как на `/friends`. Список найденных постов получил то же чередование знака, что и
+остальные ленты сайта (была последней лентой без него).
+
+### Первый экран (`HomeHero`)
+
+Стена обложек из настоящих записей ленты + заголовок поверх, растворяется к центру
+маской. **Показывается всем** — и гостю, и залогиненному, — но в двух изводах
+(проп `username?`): гостю полная высота (`py-24 sm:py-32`), слоган «Дневник,
+который слушают», две кнопки; своему — урезанная высота (`py-14 sm:py-16`),
+«Привет, {username}», одна кнопка «Записать», заголовок мельче
+(`text-3xl sm:text-4xl` против `text-4xl sm:text-6xl`). Свой приходит **читать
+ленту**, полноразмерный герой отправлял бы её за сгиб при каждом заходе.
+
+**Невидимость залогиненному была не багом, а условием с рождения** (`a0b4326`,
+`{!session && …}` в `app/page.tsx`) — если через полгода это снова будут искать
+как «пропавшую шапку»: её не удаляли, у неё просто не было своего извода. Линовка
+`body::before` и `HomeHero` приехали одним коммитом — отсюда ложное «шапка
+исчезла, когда добавили линии», связи нет.
+
+Счётчик «Уже N записей от M авторов» до этого врал при росте сайта — считался по
+`posts.length` из ленты с `take: 20`, замирал на «20 записей» навсегда. Теперь
+`getSiteStats()` (`lib/stats.ts`) — честные `COUNT`, авторы = пользователи хотя бы
+с одной записью. `plural()` для согласования числительных вынесен в `lib/plural.ts`
+(был внизу `HomeHero.tsx`, понадобился вторым местом — счётчиком скрытых дорожек
+в `PostTrackList`), файл без импортов, как `lib/ui.ts`.
+
+### Плеер, поле тетради, манифест
+
+**Плеер построен вокруг очереди** (`lib/track-queue.ts` — `QueueTrack`,
+`VISIBLE_TRACKS = 5`, `buildQueue()`, файл без импортов, годится и серверным, и
+клиентским компонентам). `PreviewPlayer.tsx` — один `<audio>` на вкладку, очередь
+и позиция в `useRef` (не state — их читают только обработчики событий `<audio>`,
+навешенные один раз; провайдер обёрнут вокруг всего дерева и лишний ререндер
+себе не может позволить). Доиграло превью — само пошло следующее (`ended`/`error`
+→ `advance()`, битый трек не обрывает альбом). `subscribeProgress` рассылает долю
+проигранного мимо React — подписана только играющая строка, пишет CSS-переменную
+себе через ref. **Грабля:** смена `audio.src` во время игры сама шлёт `pause`
+(media load algorithm) — при автопереходе была бы гонка «погасили/зажгли»;
+обходится флагом `suppressPauseRef` вокруг программной смены трека.
+
+`TrackRow.tsx` — играющая строка подсвечена (`bg-accent-wash`), трек без
+`previewUrl` не прячет кнопку, а гасит её (`disabled` + `title`). `TrackArtwork.tsx`
+(герой записи) — с очередью крутится/играет, пока звучит любая дорожка записи, не
+только первая. `PostTrackList.tsx` (новый, клиентский) — владелец сворачивания:
+видно 5 строк (`VISIBLE_TRACKS`), дальше «стопка конвертов»
+(`min(скрытых, 2)` полосок), раскрытие через `grid-template-rows: 0fr → 1fr`.
+`MAX_TRACKS_PER_POST = 20` — в `lib/post-schema.ts`, лимит и в UI (`PostForm`,
+`TrackPickerDialog`), и на сервере (`.max()` в zod). `lib/post-mutations.ts` —
+`attachTracksToPost` вставляет треки тремя запросами (`createMany skipDuplicates`
++ `findMany` + `postTrack.createMany`) вместо цикла upsert+create на каждый трек.
+
+**Грабля Playwright, пикер трека:** селектор `dialog input` матчит закрытую
+модалку поиска из шапки (она в DOM всегда) — нужен `dialog[open] input`.
+
+`app/globals.css` — вертикальное поле тетради (`html::before`, токен
+`--rule-margin`, отдельно от линовки страницы в `body::before`).
+`app/manifest.ts` — PWA-манифест (файловая конвенция App Router), даёт
+«Установить на главный экран», не даёт офлайна. `public/icon-*.png` — растр из
+знака, maskable-версия отдельно (Android режет иконку под свою форму).
+
+### Переключатель темы
+
+Три состояния — как в системе / светлая / тёмная (не два: первый клик не должен
+отвязывать от системы навсегда). `app/globals.css` — тёмная палитра продублирована
+намеренно (CSS-переменную нельзя унаследовать из другого селектора): системная
+через `:root:not([data-theme="light"])`, явная — `:root[data-theme="dark"]` ниже
+по файлу (выигрывает порядком, не весом). `lib/theme.ts` — без импортов, как
+`lib/ui.ts`; «как в системе» — это отсутствие атрибута, не третье значение.
+`app/layout.tsx` — обычный синхронный `<script>`, не `next/script` (даже
+`beforeInteractive` не блокирует отрисовку, а против вспышки цвета нужен именно
+синхронный код до первого кадра); куки не рассматривались — layout остался бы
+статикой. `ThemeToggle.tsx` — состояние через `useSyncExternalStore`, не свой
+`useState`+эффект (без лишнего ререндера и гонки с соседними вкладками).
+
+**Заодно починено:** переполнение шапки на 640-1023 px (порог `sm:` требовал
+~936 px, up на `lg`) и обрезка длинного имени пользователя на 1024 px
+(`max-w-28 xl:max-w-36`).
+
+### Дата записи на полях карточки
+
+Дата — в собственном поле записи (узкая колонка слева, волосяная линия тем же
+`--rule-margin`, что у поля страницы), не в углу карточки. `PostCard.tsx` —
+`<article>` флексом в строку, порог `lg` (не `sm` — на 640 px лента ужата
+сайдбаром). `lib/format-date.ts` — `formatPostDateParts` (год только если не
+текущий). `app/globals.css` — `--color-rule-margin` в `@theme inline`.
+
+**Правило на будущее (переполнение ленты, чинилось тут же):** `truncate` — это
+`nowrap`, обрезанный многоточием текст всё равно требует у родителя свою полную
+ширину как min-content. Флекс-элемент без `min-w-0` не сжимается ниже этого и
+выталкивает соседа — на длинных названиях треков `<main>` без `min-w-0` распирал
+страницу вбок. `truncate` ограничивает ширину только там, где у каждого
+флекс-предка есть `min-w-0` — само по себе оно не держит.
+
 ## Data model (Prisma)
  
 Ключевые модели: `User`, `Track`, `Post`, `PostTrack`, `Comment`, `Like`, `Follow`.
@@ -71,9 +486,13 @@ npx prisma migrate dev --name <имя>   # новая миграция
 
 **`P1001: Can't reach database server` от Prisma не всегда значит проблему с сетью** — через pgbouncer (transaction pooler, порт 6543) эта ошибка может маскировать обычный `28P01: password authentication failed`. Если TCP-соединение до хоста при этом раскрывается нормально (проверить `Test-NetConnection`/аналог) — не тратить время на сетевую диагностику, а сразу проверить сам пароль прямым тестовым подключением через `pg` (`new pg.Client({connectionString}).connect()`), это даёт настоящую причину.
 
+**Вторая причина того же `P1001` — мёртвый NAT64-IPv6 (поймано 2026-08-19).** Если `pg` из Node подключается тем же URL, а CLI нет — дело не в сети и не в пароле: DNS отдаёт сначала адреса `64:ff9b::…`, они не отвечают, Node 20+ спасается Happy Eyeballs (`autoSelectFamily`, пробует оба семейства параллельно), а Rust-движок Prisma берёт первый адрес и падает. Обход — обёртка, которая резолвит IPv4 (`dns.resolve4`) и подменяет хост в `DIRECT_URL` только на время запуска CLI; `.env.local` и `prisma.config.ts` не трогать. Работает потому, что пулер Supabase маршрутизирует тенант по имени пользователя, а не по хосту.
+
 **`directUrl` в `prisma.config.ts` не существует — реальная причина плавающих зависаний/ошибок `migrate`/`db push` (найдено 2026-08-06 через `npx tsc --noEmit`).** Тип `Datasource` в `@prisma/config` (`node_modules/@prisma/config/dist/index.d.ts`) содержит только `url` и `shadowDatabaseUrl` — поля `directUrl` там нет и не было, несмотря на то что так же писал даже один из референсов официального skill `prisma-upgrade-v7` (`references/prisma-config.md` — расхождение с реальным типом, не доверять слепо и этим референсам, перепроверять tsc'ом). Поле тихо игнорировалось (конфиг грузится без тайпчека), из-за чего CLI-команды всё это время ходили через `DATABASE_URL` (transaction pooler, порт 6543) вместо `DIRECT_URL` — а pgbouncer в transaction-режиме не гарантирует операции уровня сессии, нужные миграциям (advisory locks, `CREATE DATABASE` для shadow-базы). Отсюда нестабильность: то зависание, то `P1001`, то `P1000` — в отличие от простых запросов через голый `pg`, которые транзакционный pooler спокойно тянет.
 
 **Правило:** в `prisma.config.ts` → `datasource` класть **только** `url`, и туда должен идти `DIRECT_URL` (session pooler), а не пулированный `DATABASE_URL`. `DATABASE_URL` нужен исключительно рантайму приложения (driver adapter в коде, `lib/auth.ts` и т.п.) — `prisma.config.ts` он не касается вообще, это конфиг только для CLI-тулинга (migrate/db push/studio).
+
+**После изменения схемы дев-сервер надо перезапустить, hot-reload не спасает** (поймано 2026-08-17 на `ignoredAt`). `next dev` держит в памяти *старый* сгенерированный клиент, и запрос с новым полем падает рантайм-ошибкой `PrismaClientValidationError: Unknown argument 'X'` — при том что `npx tsc --noEmit` уже зелёный (он читает свежие типы с диска). Симптом обманчивый: выглядит как «фича не работает», а не как «сервер устарел». Порядок: `migrate dev` → `generate` → **перезапуск** `npm run dev`. И `npx prisma generate` после `migrate dev` лишним не бывает — клиент не всегда обновляется сам.
 
 **Если Prisma CLI видит, что её вызывает AI-агент** (Claude Code и подобные) — она блокирует опасные команды типа `migrate reset` без явного согласия человека и просит перезапустить с `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=<точный текст согласия пользователя>`. Это встроенная защита самой Prisma, не баг — всегда спрашивать пользователя перед таким перезапуском, не обходить.
 
@@ -90,20 +509,46 @@ npx prisma migrate dev --name <имя>   # новая миграция
 с клиента: у MusicBrainz нужен кастомный заголовок, а лимиты обоих API считаются
 по IP, так что их надо контролировать централизованно и кешировать.
  
-## Поиск по сайту (решение зафиксировано, реализация — будущая сессия)
+## Поиск по сайту (реализовано 2026-08-13)
 
 Важно не путать с поиском трека на `/new` (это поиск во внешнем iTunes/MusicBrainz
 API при создании поста, уже описан выше в "Внешние API"). Здесь речь о другом —
-о сквозном поиске по уже своим данным: посты, треки, пользователи.
+о сквозном поиске по уже своим данным: посты, треки, пользователи. Движок —
+встроенный полнотекстовый поиск Postgres, без сторонних сервисов
+(Meilisearch/Algolia) — не тащим новую инфраструктуру, пока нет реальной нагрузки.
 
-- Искать будем сразу по всему: постам (текст), трекам (название/артист) и
-  пользователям (аккаунтам) — как в ТикТоке, не только по постам
-- Движок — встроенный полнотекстовый поиск Postgres, без сторонних сервисов
-  (Meilisearch/Algolia и т.п.) — не тащим новую инфраструктуру, пока нет
-  реальной нагрузки
-- Реализация откладывается до появления реальных постов (после того как
-  заработает создание поста) — раньше физически нечего искать и не на чем
-  проверить
+Что неочевидно и стоит помнить:
+
+- **Индексы живут только в миграции, не в `schema.prisma`.** Prisma не умеет
+  объявлять `tsvector`/GIN — три expression-индекса написаны руками
+  (`prisma/migrations/*_add_fulltext_search_indexes/`). Выбраны expression-индексы
+  (`USING GIN (to_tsvector(...))`), а не хранимая generated-колонка: индекс сам
+  всегда синхронен с данными, ни новой колонки, ни триггера. **Проверено:
+  дрейфом Prisma это не считает** (`migrate diff` → пусто, `migrate dev` →
+  "Already in sync"), удалить не предложит. Обратная сторона: `schema.prisma`
+  больше не полное описание БД — про эти индексы знает только папка миграций.
+- **Выражение в `WHERE` должно буквально совпадать с выражением в индексе**,
+  иначе Postgres индекс не подхватит. Отсюда дублирование `to_tsvector(...)`
+  в `WHERE` и в `ORDER BY ts_rank(...)` в `lib/search.ts` — это не копипаста
+  по недосмотру.
+- **Колонки в склейке обязаны быть NOT NULL.** В SQL `'текст' || NULL` = `NULL`,
+  так что одно nullable-поле в `title || ' ' || artist` тихо выкинуло бы строку
+  из индекса. Сейчас все четыре склеиваемых поля NOT NULL — при изменении схемы
+  перепроверить.
+- **`websearch_to_tsquery`, а не `to_tsquery`** — не падает на произвольном
+  пользовательском вводе (одиночные `!`, `&`, кавычки), плюс даёт Google-подобный
+  синтаксис (`"фраза"`, `or`, `-исключение`). `to_tsquery` на мусоре кидает
+  исключение → 500 на публичной странице.
+- **`'russian'` для постов, `'simple'` для треков/юзеров.** Постам нужен
+  стемминг («замечательные» находит «замечательный»), именам и названиям он бы
+  только мешал, и они не обязательно на русском.
+- **Префиксного поиска нет** — FTS матчит слова/основы целиком, `zer` не найдёт
+  `ZeroneR`. Это ограничение движка, не баг. Если понадобится тайпахед —
+  отдельным шагом через `pg_trgm` или `to_tsquery` с `:*`.
+- **Отлаживать поиск с кириллицей из Git Bash нельзя** — шелл на Windows отдаёт
+  аргументы в cp1251, `curl --data-urlencode` честно закодирует битые байты, и
+  получится ложный вывод "кириллица не ищется" при исправном коде. Проверять
+  Node-скриптом (файл в UTF-8) или из браузера.
 
 ## Конвенции
  
@@ -164,6 +609,16 @@ Solo-разработчик уровня junior-to-middle, возвращает�
   альтернативы и почему выбран именно этот
 - Не бойся давать чуть больше контекста, чем нужно для конкретной задачи,
   если это помогает понять механизм, а не просто скопировать код
+- Если нужно представить план (например, из Plan Mode) — сначала простыми
+  словами, через аналогию с уже сделанным в проекте (пример: аватарка —
+  такая же ссылка, как обложка трека, ничего нового изобретать не надо).
+  Технические детали (имена файлов, конкретные API) — только по запросу.
+  Файл плана — это шпаргалка для самого агента на следующую сессию, не текст
+  для разработчика; не пересказывать его как есть.
+- Объяснять код лучше по шагам прямо во время реализации, а не одной стеной
+  текста заранее — так усваивается лучше (сработало 2026-08-08 на примере
+  сессии про аватар: стена терминов про Server Actions/RLS/service_role не
+  зашла, а аналогия с обложкой трека и обещание объяснять по ходу — зашли)
 
 ## Чего избегать
  

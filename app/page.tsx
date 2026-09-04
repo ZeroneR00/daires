@@ -1,97 +1,108 @@
-import Link from "next/link";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { getFeedPosts } from "@/lib/posts";
+import { getFeedPosts, getLikedPostIds } from "@/lib/posts";
+import { getSiteStats } from "@/lib/stats";
 import { PostCard } from "@/components/PostCard";
+import { HomeHero } from "@/components/HomeHero";
+import { Groove } from "@/components/Groove";
+import { artworkAtSize } from "@/lib/artwork";
 
 export const dynamic = "force-dynamic";
 
-const cardClassName =
-  "rounded-2xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-black";
+const cardClassName = "rounded-card border border-line bg-surface p-6";
 
 export default async function Home() {
-  const [session, posts] = await Promise.all([
+  const [session, posts, siteStats] = await Promise.all([
     auth.api.getSession({ headers: await headers() }),
     getFeedPosts(),
+    getSiteStats(),
   ]);
+  const likedPostIds = session
+    ? await getLikedPostIds(
+        session.user.id,
+        posts.map((post) => post.id),
+      )
+    : new Set<string>();
+
+  // Стена на первом экране собирается из обложек самой ленты — отдельного
+  // запроса не нужно, посты уже загружены выше.
+  const artworks = Array.from(
+    new Set(
+      posts
+        .flatMap((post) => post.tracks.map((t) => t.track.artworkUrl))
+        .map((url) => artworkAtSize(url, 200))
+        .filter((url): url is string => url !== null),
+    ),
+  );
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 bg-zinc-50 px-4 py-12 font-sans dark:bg-black sm:flex-row sm:px-6">
-      <main className="flex flex-1 flex-col gap-6">
-        <div className={cardClassName}>
-          {session ? (
-            <>
-              <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
-                Привет, {session.user.username}!
-              </h1>
-              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                Рады видеть тебя снова.
-              </p>
-            </>
-          ) : (
-            <>
-              <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
-                Добро пожаловать в music-diary
-              </h1>
-              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                Веди свой музыкальный дневник: пиши о треках, которые слушаешь,
-                и делись впечатлениями.
-              </p>
-              <div className="mt-4 flex gap-3 text-sm font-medium">
-                <Link
-                  href="/signup"
-                  className="flex h-10 items-center rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
-                >
-                  Зарегистрироваться
-                </Link>
-                <Link
-                  href="/login"
-                  className="flex h-10 items-center rounded-full border border-black/[.08] px-5 text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
-                >
-                  Войти
-                </Link>
-              </div>
-            </>
-          )}
-        </div>
+    <>
+      <HomeHero
+        artworks={artworks}
+        postCount={siteStats.postCount}
+        authorCount={siteStats.authorCount}
+        username={session?.user.username}
+      />
 
+      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:flex-row sm:px-6">
+      <main className="flex min-w-0 flex-1 flex-col gap-6">
         {posts.length > 0 ? (
           <div className="flex flex-col gap-4">
-            {posts.map((post) => (
-              <PostCard key={post.id} post={post} />
+            {posts.map((post, index) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                currentUserId={session?.user.id}
+                isLiked={likedPostIds.has(post.id)}
+                showMark={index % 2 === 0}
+              />
             ))}
           </div>
         ) : (
-          <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-dashed border-black/[.15] p-6 text-center dark:border-white/[.2]">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              Лента постов появится здесь, когда кто-то опубликует первый трек.
+          <div className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-card border border-dashed border-line p-8 text-center">
+            <p className="font-serif text-lg text-ink">Здесь пока тихо</p>
+            <p className="text-sm text-muted">
+              Лента оживёт, когда появится первая запись.
             </p>
           </div>
         )}
+
+        {/* Знак закрывает ленту: «записи кончились», а не обрыв в пустоту */}
+        <Groove className="pt-2" />
       </main>
 
-      <aside className="flex w-full shrink-0 flex-col gap-6 sm:w-72">
+      <aside className="flex w-full shrink-0 flex-col gap-4 sm:w-72">
         <div className={cardClassName}>
-          <h2 className="text-sm font-semibold text-black dark:text-zinc-50">
-            О чём этот сайт
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted">
+            О чём это
           </h2>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-3 text-sm leading-relaxed text-ink">
             music-diary — платформа для музыкальных дневников. Каждый пост —
             это личный текст и прикреплённый трек.
           </p>
         </div>
 
         <div className={cardClassName}>
-          <h2 className="text-sm font-semibold text-black dark:text-zinc-50">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted">
             Как это работает
           </h2>
-          <ol className="mt-2 flex flex-col gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-            <li>1. Зарегистрируйся</li>
-            <li>2. Найди трек, который слушаешь</li>
-            <li>3. Напиши пост с впечатлениями</li>
+          <ol className="mt-3 flex flex-col gap-3 text-sm text-ink">
+            <li className="flex gap-3">
+              <span className="font-serif text-accent">1</span>
+              Заведи дневник
+            </li>
+            <li className="flex gap-3">
+              <span className="font-serif text-accent">2</span>
+              Найди трек, который слушаешь
+            </li>
+            <li className="flex gap-3">
+              <span className="font-serif text-accent">3</span>
+              Напиши, что он с тобой сделал
+            </li>
           </ol>
         </div>
       </aside>
     </div>
+    </>
   );
 }

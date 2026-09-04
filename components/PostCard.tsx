@@ -37,9 +37,9 @@ export function PostCard({
   const dateIso = post.createdAt.toISOString();
   const { day, month, year } = formatPostDateParts(post.createdAt);
 
-  // Первый трек играет роль обложки записи, остальные идут списком ниже.
-  const [heroPostTrack, ...restTracks] = post.tracks;
-  const hero = heroPostTrack?.track;
+  // Первый трек играет роль обложки записи, но из списка ниже не выпадает:
+  // иначе включить его отдельно было бы неоткуда.
+  const hero = post.tracks[0]?.track;
   // Очередь собирается один раз на карточку и уходит и герою, и списку:
   // запись играет альбомом, с какой дорожки её ни запусти.
   const queue = buildQueue(post.tracks);
@@ -138,7 +138,7 @@ export function PostCard({
         </div>
 
         <PostTrackList
-          tracks={restTracks.map((postTrack) => postTrack.track)}
+          tracks={post.tracks.map((postTrack) => postTrack.track)}
           queue={queue}
         />
 

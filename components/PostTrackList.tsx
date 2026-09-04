@@ -19,15 +19,14 @@ interface ListTrack {
 }
 
 interface PostTrackListProps {
-  /** Дорожки после героя: он показан обложкой и в списке не повторяется. */
+  /** Все дорожки записи по порядку, включая первую (она же на обложке). */
   tracks: ListTrack[];
   /** Очередь всей записи, включая героя, — по ней играет любая строка. */
   queue: QueueTrack[];
   heading?: string;
 }
 
-/* Герой — дорожка №1, значит в списке видно на одну меньше. */
-const VISIBLE_ROWS = VISIBLE_TRACKS - 1;
+const VISIBLE_ROWS = VISIBLE_TRACKS;
 /* Больше двух краёв стопка не показывает: это конверты, а не веер. */
 const MAX_SHEETS = 2;
 
@@ -42,7 +41,11 @@ const MAX_SHEETS = 2;
 export function PostTrackList({ tracks, queue, heading }: PostTrackListProps) {
   const [expanded, setExpanded] = useState(false);
 
-  if (tracks.length === 0) return null;
+  /*
+    Одна дорожка — список не нужен: он повторил бы обложку строка в строку,
+    и запустить с неё нечего, чего не запускала бы кнопка на самой обложке.
+  */
+  if (tracks.length < 2) return null;
 
   const visible = tracks.slice(0, VISIBLE_ROWS);
   const hidden = tracks.slice(VISIBLE_ROWS);
@@ -57,8 +60,7 @@ export function PostTrackList({ tracks, queue, heading }: PostTrackListProps) {
       key={track.id}
       track={track}
       trackId={track.id}
-      /* +2: герой занял первый номер */
-      index={listIndex + 2}
+      index={listIndex + 1}
       queue={queue}
       queueIndex={queue.findIndex((item) => item.id === track.id)}
     />

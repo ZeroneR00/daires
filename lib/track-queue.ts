@@ -12,7 +12,7 @@ export interface QueueTrack {
   previewUrl: string;
 }
 
-/** Сколько дорожек записи видно до раскрытия — считая героя (дорожку №1). */
+/** Сколько строк списка дорожек видно до раскрытия. */
 export const VISIBLE_TRACKS = 5;
 
 /*

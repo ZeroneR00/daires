@@ -38,9 +38,9 @@ export default async function PostPage({ params }: PostPageProps) {
   const isOwner = session?.user.id === post.authorId;
 
   // Первый трек — герой записи, как и в карточке ленты, но крупнее: здесь
-  // запись читают, а не проглядывают. Остальные идут списком ниже.
-  const [heroPostTrack, ...restTracks] = post.tracks;
-  const hero = heroPostTrack?.track;
+  // запись читают, а не проглядывают. Из списка дорожек он при этом не
+  // выпадает — иначе включить его отдельно было бы неоткуда.
+  const hero = post.tracks[0]?.track;
   const heroArtwork = artworkAtSize(hero?.artworkUrl ?? null, 400);
   const queue = buildQueue(post.tracks);
 
@@ -118,9 +118,9 @@ export default async function PostPage({ params }: PostPageProps) {
         )}
 
         <PostTrackList
-          tracks={restTracks.map((postTrack) => postTrack.track)}
+          tracks={post.tracks.map((postTrack) => postTrack.track)}
           queue={queue}
-          heading="Ещё в записи"
+          heading="Дорожки"
         />
 
         {/* Простая линейка, а не знак: знак на этой странице стоит один раз —

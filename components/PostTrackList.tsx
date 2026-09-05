@@ -42,10 +42,20 @@ export function PostTrackList({ tracks, queue, heading }: PostTrackListProps) {
   const [expanded, setExpanded] = useState(false);
 
   /*
-    Одна дорожка — список не нужен: он повторил бы обложку строка в строку,
-    и запустить с неё нечего, чего не запускала бы кнопка на самой обложке.
+    Пустой записи список не положен, а одна дорожка его получает. Раньше порог
+    был два: считалось, что одинокая строка лишь повторяет обложку. Повтор и
+    правда есть, но строка — это не «оглавление», а сам плеер, и когда у одних
+    записей он под обложкой есть, а у других нет, лента читается сломанной.
+    Постоянное место у плеера важнее сэкономленной строки.
   */
-  if (tracks.length < 2) return null;
+  if (tracks.length === 0) return null;
+
+  /*
+    Номер осмыслен, только когда у него бывают соседи: «1» в списке из одной
+    строки — шум, а не порядок. TrackRow без index живёт и так — ровно в таком
+    виде он стоит в поиске и в пикере трека.
+  */
+  const numbered = tracks.length > 1;
 
   const visible = tracks.slice(0, VISIBLE_ROWS);
   const hidden = tracks.slice(VISIBLE_ROWS);
@@ -60,7 +70,7 @@ export function PostTrackList({ tracks, queue, heading }: PostTrackListProps) {
       key={track.id}
       track={track}
       trackId={track.id}
-      index={listIndex + 1}
+      index={numbered ? listIndex + 1 : undefined}
       queue={queue}
       queueIndex={queue.findIndex((item) => item.id === track.id)}
     />

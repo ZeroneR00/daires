@@ -25,10 +25,11 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "ru",
     start_url: "/",
     display: "standalone",
-    // Цвет бумаги, а не акцента: приложение должно выглядеть тетрадью,
+    // Цвет бумаги, а не акцента: приложение должно выглядеть тетрадью
+    // (с недавних пор — залитой кофе, отсюда коричневый),
     // и им же красится системная полоса статуса на Android.
-    background_color: "#fbf8f3",
-    theme_color: "#fbf8f3",
+    background_color: "#2a1e17",
+    theme_color: "#2a1e17",
     icons: [
       {
         src: "/icon-192.png",

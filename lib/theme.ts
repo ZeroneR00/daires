@@ -1,19 +1,35 @@
 /*
-  Тема: «как в системе» (по умолчанию), светлая или тёмная явно.
+  Тема: три сорта кофе, от самого крепкого к самому молочному.
 
   Файл намеренно без единого импорта — по образцу `lib/ui.ts` и
   `lib/realtime-channel.ts`: его тянет и клиентский компонент-переключатель,
   и серверный `app/layout.tsx`, который вставляет отсюда строку скрипта.
 
-  Правило одно: атрибут `data-theme` на <html> ставится **только** при явном
-  выборе. «Как в системе» — это его отсутствие, а не третье значение: тогда
-  тему решает медиа-запрос в `app/globals.css`, и ничего специально
-  переключать не нужно.
+  Что здесь поменялось по сравнению с прошлой версией и почему это важно
+  понимать: раньше состояний было тоже три, но одно из них — «как в системе» —
+  было не значением, а ОТСУТСТВИЕМ атрибута `data-theme`: тему тогда решал
+  медиа-запрос `prefers-color-scheme` в CSS. Теперь за системой сайт не следит
+  вовсе, и отсутствие атрибута означает всего лишь «человек ещё не выбирал» —
+  показывается палитра по умолчанию. Медиа-запрос из `globals.css` за
+  ненадобностью убран, а вместе с ним и дублирование тёмной палитры, которое он
+  раньше вынуждал держать.
 */
 
-export type Theme = "system" | "light" | "dark";
+export type Theme = "coffee" | "latte" | "mocha";
 
-export const THEMES: readonly Theme[] = ["system", "light", "dark"];
+/*
+  Порядок = порядок обхода по клику: кофе → кофе с молоком → мокачино → кофе.
+  От крепкого к молочному, то есть от самого тёмного к самому светлому.
+*/
+export const THEMES: readonly Theme[] = ["coffee", "latte", "mocha"];
+
+/*
+  По умолчанию — средний сорт. Он же лежит голыми значениями в `:root`, поэтому
+  для него в CSS нет своего блока-переопределения: `data-theme="latte"` не
+  совпадает ни с одним правилом, и палитра берётся из `:root`. Это не забывчивость,
+  а способ не держать одни и те же значения в файле дважды.
+*/
+export const DEFAULT_THEME: Theme = "latte";
 
 export const THEME_STORAGE_KEY = "music-diary:theme";
 
@@ -24,31 +40,45 @@ export const THEME_STORAGE_KEY = "music-diary:theme";
 */
 export const THEME_CHANGE_EVENT = "music-diary:theme-change";
 
+/*
+  В хранилище у вернувшихся людей лежат имена прошлой системы тем. Выбрасывать
+  их молча — значит откатить человека к умолчанию без объяснений, поэтому старые
+  значения переводятся в ближайший сорт: «тёмная» была почти чёрной, «светлая» —
+  ровно тем, что теперь зовётся кофе с молоком.
+*/
+const LEGACY: Record<string, Theme> = {
+  dark: "coffee",
+  light: "latte",
+  system: DEFAULT_THEME,
+};
+
+function normalize(stored: string | null): Theme {
+  if (stored && (THEMES as readonly string[]).includes(stored)) {
+    return stored as Theme;
+  }
+  return (stored && LEGACY[stored]) || DEFAULT_THEME;
+}
+
 export function readTheme(): Theme {
   try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    return stored === "light" || stored === "dark" ? stored : "system";
+    return normalize(localStorage.getItem(THEME_STORAGE_KEY));
   } catch {
-    // Приватный режим и запрет на хранилище — «как в системе», это рабочий исход
-    return "system";
+    // Приватный режим и запрет на хранилище — умолчание, это рабочий исход
+    return DEFAULT_THEME;
   }
 }
 
 export function setTheme(theme: Theme) {
-  const root = document.documentElement;
-
-  if (theme === "system") {
-    root.removeAttribute("data-theme");
-  } else {
-    root.dataset.theme = theme;
-  }
+  /*
+    Атрибут ставится всегда, включая умолчание. Можно было бы для `latte` его
+    снимать — палитра-то и так в `:root`, — но тогда «не выбирал» и «выбрал
+    средний» стали бы неразличимы в разметке, а отлаживать тему удобнее, когда
+    в <html> честно написано, что показывают.
+  */
+  document.documentElement.dataset.theme = theme;
 
   try {
-    if (theme === "system") {
-      localStorage.removeItem(THEME_STORAGE_KEY);
-    } else {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
-    }
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {
     // Выбор не переживёт перезагрузку, но текущая страница уже перекрасилась
   }
@@ -60,19 +90,25 @@ export function setTheme(theme: Theme) {
   Скрипт против вспышки чужой темы.
 
   Сервер не знает выбор человека — тот лежит в localStorage, — поэтому в
-  разметке, приезжающей с сервера, атрибута нет и первый кадр рисуется по
-  системной настройке. Поставить атрибут из эффекта поздно: React выполнит
-  его уже после отрисовки, и выбравший светлую при тёмной системе увидит
-  чёрную вспышку на каждой загрузке.
+  разметке, приезжающей с сервера, атрибута нет, и первый кадр рисуется
+  палитрой по умолчанию. Поставить атрибут из эффекта поздно: React выполнит
+  его уже после отрисовки, и выбравший чёрный кофе увидит вспышку молочного
+  на каждой загрузке.
 
   Лечится синхронным инлайн-скриптом в самом начале <body>: браузер
   выполняет его до того, как дойдёт до содержимого страницы и что-либо
   нарисует. `next/script` со стратегией beforeInteractive сюда не подходит —
   по документации он отрисовку не блокирует.
 
+  Список сортов и таблица старых имён вшиваются в скрипт через JSON.stringify,
+  а не переписываются строкой руками: разъехаться с константами выше они
+  так не смогут.
+
   Минифицирован руками и обёрнут в try/catch: это единственный код проекта,
   который выполняется вне React, и упасть он права не имеет.
 */
-export const THEME_INIT_SCRIPT = `try{var t=localStorage.getItem(${JSON.stringify(
+export const THEME_INIT_SCRIPT = `try{var k=${JSON.stringify(
   THEME_STORAGE_KEY,
-)});if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
+)},a=${JSON.stringify(THEMES)},l=${JSON.stringify(
+  LEGACY,
+)},t=localStorage.getItem(k);t=a.indexOf(t)>-1?t:l[t];if(t)document.documentElement.dataset.theme=t}catch(e){}`;

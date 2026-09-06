@@ -1,9 +1,18 @@
 import type { PostWithDetails } from "@/lib/posts";
 
+/*
+  Сборка RSS. Резать ленту до этого лимита — задача здесь, а не в query-слое:
+  getPostsByUsername() отдаёт все посты автора без ограничения, потому что её
+  зовёт ещё и страница дневника, которой лимит не нужен.
+*/
 export const RSS_ITEM_LIMIT = 20;
 
 const TITLE_MAX_LENGTH = 80;
 
+/*
+  Порядок замен важен: & обязан идти первым. Иначе он пройдётся по уже
+  подставленным &lt; / &gt; и превратит их в &amp;lt; — экранирование задвоится.
+*/
 export function escapeXml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -21,6 +30,12 @@ function truncate(text: string, maxLength: number): string {
   return `${boundary}…`;
 }
 
+/*
+  Заголовок записи генерируется на лету и нигде не хранится: поля Post.title
+  в схеме нет и заводить его ради фида не стали. Три ступени вниз — первая
+  непустая строка текста, потом «Артист — Название» первого трека (пост без
+  текста, только с треком, — штатный случай), потом слово «Запись».
+*/
 export function deriveTitle(post: PostWithDetails): string {
   const firstLine = post.text
     .split("\n")
@@ -45,6 +60,7 @@ function renderItem(post: PostWithDetails, origin: string): string {
     `<title>${escapeXml(deriveTitle(post))}</title>`,
     `<link>${escapeXml(link)}</link>`,
     `<guid>${escapeXml(link)}</guid>`,
+    // toUTCString (RFC-1123), а не toISOString: часть читалок ISO не разберёт
     `<pubDate>${post.createdAt.toUTCString()}</pubDate>`,
     `<description>${escapeXml(post.text)}</description>`,
     "</item>",

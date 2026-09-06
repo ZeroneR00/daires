@@ -18,6 +18,11 @@ interface AvatarUploadFormProps {
   initialAvatarUrl: string | null;
 }
 
+/*
+  Единственная форма проекта на нативном <form action={fn}> + FormData +
+  useActionState, а не на useTransition, как соседний SettingsForm: File нельзя
+  передать в экшен обычным JS-объектом, он доезжает только внутри FormData.
+*/
 export function AvatarUploadForm({ initialAvatarUrl }: AvatarUploadFormProps) {
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [message, setMessage] = useState<{
@@ -79,6 +84,13 @@ export function AvatarUploadForm({ initialAvatarUrl }: AvatarUploadFormProps) {
               name="avatar"
               accept="image/jpeg,image/png,image/webp"
               disabled={isUploading}
+              /*
+                Инпут спрятан, его роль играет стилизованный <label htmlFor>:
+                нативный вид файлового поля не поддаётся CSS. Отправка идёт сразу
+                по выбору файла — отдельная кнопка «Загрузить» тут была и путала:
+                промахнувшись мимо крошечного нативного поля, человек жал её и
+                получал «Файл не выбран».
+              */
               onChange={(e) => e.currentTarget.form?.requestSubmit()}
               className="hidden"
             />

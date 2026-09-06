@@ -7,6 +7,12 @@ import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { avatarFileSchema, profileInputSchema, type ProfileInput } from "@/lib/profile-schema";
 
+/*
+  Пишем в базу напрямую, а не через authClient.updateUser(): bio не
+  зарегистрирован у Better Auth как additionalField, и его апдейт через клиент
+  просто не доедет. Редиректа в конце нет намеренно — форма показывает инлайн
+  «Сохранено» и оставляет человека на месте.
+*/
 export async function updateProfile(
   input: ProfileInput,
 ): Promise<{ error: string } | { success: true }> {
@@ -56,6 +62,11 @@ export async function uploadAvatar(
   const file = parsed.data;
   const userId = session.user.id;
 
+  /*
+    Путь в bucket фиксированный — сам userId, без имени файла и без расширения.
+    upsert перезаписывает прошлый аватар на месте, поэтому удалять старый
+    отдельно не нужно и мусор не копится.
+  */
   const { error: uploadError } = await supabase.storage
     .from("avatars")
     .upload(userId, file, { upsert: true, contentType: file.type });
@@ -64,6 +75,11 @@ export async function uploadAvatar(
     return { error: "Не удалось загрузить файл, попробуй ещё раз" };
   }
 
+  /*
+    Адрес постоянный, поэтому браузер и CDN отдали бы прошлое фото. ?v=<время>
+    меняет URL при каждой загрузке и обходит кэш — иначе человек жмёт «сохранить»
+    и видит старый аватар, то есть решает, что ничего не сработало.
+  */
   const { data } = supabase.storage.from("avatars").getPublicUrl(userId);
   const avatarUrl = `${data.publicUrl}?v=${Date.now()}`;
 

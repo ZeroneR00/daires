@@ -444,6 +444,12 @@ body::before {
   animation: waveline-write 2s linear infinite;
 }
 
+/*
+  Не сворачивать в calc(var(--stroke-len) * -1): calc() с var() внутри
+  @keyframes не интерполируется, анимация станет дискретной — знак пойдёт
+  ступенями. Вторая переменная приезжает готовым числом; подробности — в
+  комментарии Waveline.tsx, который её и считает.
+*/
 @keyframes waveline-write {
   from {
     stroke-dashoffset: var(--stroke-len, 110);

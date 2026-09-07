@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getFollowingFeedPosts, getLikedPostIds } from "@/lib/posts";
 import { PostCard } from "@/components/PostCard";
+import { FeedLoader } from "@/components/FeedLoader";
+import { loadMoreFollowingFeed } from "@/lib/feed-actions";
 import { Groove } from "@/components/Groove";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +14,8 @@ export default async function FollowingFeedPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
 
-  const posts = await getFollowingFeedPosts(session.user.id);
+  const feed = await getFollowingFeedPosts(session.user.id);
+  const posts = feed.posts;
   const likedPostIds = await getLikedPostIds(session.user.id, posts.map((post) => post.id));
 
   return (
@@ -38,24 +41,33 @@ export default async function FollowingFeedPage() {
               showMark={index % 2 === 0}
             />
           ))}
+
+          {/* Хвост ленты: подгрузка следующих порций и знак в самом конце */}
+          <FeedLoader
+            initialCursor={feed.nextCursor}
+            initialIndex={posts.length}
+            loadMore={loadMoreFollowingFeed}
+          />
         </div>
       ) : (
-        <div className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-card border border-dashed border-line p-8 text-center">
-          <p className="font-serif text-lg text-ink">Здесь пока тихо</p>
-          <p className="text-sm text-muted">
-            Пока не подписан(а) ни на кого. Загляни в чей-нибудь дневник и подпишись.
-          </p>
-          <Link
-            href="/"
-            className="mt-3 text-sm font-medium text-accent transition-opacity hover:opacity-80"
-          >
-            Открыть общую ленту
-          </Link>
-        </div>
-      )}
+        <>
+          <div className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-card border border-dashed border-line p-8 text-center">
+            <p className="font-serif text-lg text-ink">Здесь пока тихо</p>
+            <p className="text-sm text-muted">
+              Пока не подписан(а) ни на кого. Загляни в чей-нибудь дневник и подпишись.
+            </p>
+            <Link
+              href="/"
+              className="mt-3 text-sm font-medium text-accent transition-opacity hover:opacity-80"
+            >
+              Открыть общую ленту
+            </Link>
+          </div>
 
-      {/* Тот же знак, что закрывает главную: это вторая лента сайта, а не другой экран */}
-      <Groove className="pt-2" />
+          {/* Тот же знак, что закрывает главную: это вторая лента сайта, а не другой экран */}
+          <Groove className="pt-2" />
+        </>
+      )}
     </div>
   );
 }

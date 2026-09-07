@@ -1,5 +1,5 @@
-import { getFeedPosts } from "@/lib/posts";
-import { renderFeed } from "@/lib/rss";
+import { getRecentPosts } from "@/lib/posts";
+import { renderFeed, RSS_ITEM_LIMIT } from "@/lib/rss";
 
 /*
   Route handler, а не Server Action — редкое в этом проекте исключение из
@@ -10,7 +10,8 @@ import { renderFeed } from "@/lib/rss";
 export async function GET(request: Request) {
   // Origin берём из самого запроса: ни конфига, ни env-переменной с адресом
   const origin = new URL(request.url).origin;
-  const posts = await getFeedPosts();
+  // Лимит фида задаёт сам фид: у ленты сайта своя, куда меньшая порция
+  const posts = await getRecentPosts(RSS_ITEM_LIMIT);
 
   const xml = renderFeed({
     posts,

@@ -11,14 +11,103 @@ const postWithDetails = {
 
 export type PostWithDetails = Prisma.PostGetPayload<typeof postWithDetails>;
 
-const FEED_PAGE_SIZE = 20;
+/*
+  Обе ленты сайта листаются курсором и отдаются порциями — размеры разные
+  намеренно. Первая должна уверенно переполнить экран: не переполнила — нечего
+  скроллить, и подгрузка никогда не запустится. Дальше наоборот, чем меньше
+  пачка, тем короче пауза и незаметнее шов.
+*/
+const FEED_FIRST_SIZE = 10;
+const FEED_MORE_SIZE = 8;
 
-export function getFeedPosts(): Promise<PostWithDetails[]> {
+/*
+  Порядок двухступенчатый: `createdAt`, а при совпадении — `id`. Одного
+  `createdAt` мало: у двух записей, созданных в одну миллисекунду, взаимный
+  порядок не определён, база вправе вернуть их по-разному в двух соседних
+  запросах — и курсор на такой паре либо повторит запись, либо перепрыгнет.
+  `id` уникален и достраивает сортировку до строгой.
+*/
+const feedOrderBy: Prisma.PostOrderByWithRelationInput[] = [
+  { createdAt: "desc" },
+  { id: "desc" },
+];
+
+export interface FeedPage {
+  posts: PostWithDetails[];
+  /** id последней выданной записи; `null` — дальше ничего нет */
+  nextCursor: string | null;
+}
+
+/*
+  Курсор, а не `skip`: пока читатель листает, кто-то пишет новую запись, всё
+  съезжает на позицию вниз — и при оффсете последняя запись прошлой порции
+  приезжает второй раз. Курсор привязан к строке, вставки выше него на выдачу
+  не влияют.
+
+  Запрашиваем на одну запись больше, чем отдаём: лишняя не показывается, она
+  нужна только чтобы отличить «дальше есть» от «лента кончилась». Иначе пришлось
+  бы либо считать `count()` вторым запросом, либо оставлять читателю кнопку
+  «Ещё», ведущую в пустоту.
+*/
+async function getFeedPage(
+  where: Prisma.PostWhereInput,
+  cursor?: string,
+): Promise<FeedPage> {
+  const size = cursor ? FEED_MORE_SIZE : FEED_FIRST_SIZE;
+
+  const posts = await prisma.post.findMany({
+    ...postWithDetails,
+    where,
+    orderBy: feedOrderBy,
+    take: size + 1,
+    // `skip: 1` — сама запись-курсор уже показана в предыдущей порции
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+  });
+
+  const hasMore = posts.length > size;
+  if (hasMore) posts.pop();
+
+  return {
+    posts,
+    nextCursor: hasMore ? posts[posts.length - 1].id : null,
+  };
+}
+
+export function getFeedPosts(cursor?: string): Promise<FeedPage> {
+  return getFeedPage({}, cursor);
+}
+
+/*
+  Отдельный вход для RSS, хотя запрос почти тот же. Размер порции у ленты —
+  вопрос вёрстки (сколько влезает в экран и сколько не жалко подгрузить),
+  у фида — вопрос протокола (сколько записей ждёт читалка). Пока это было
+  одно число, правка вёрстки молча укорачивала фид: ровно так первая версия
+  этого шага и урезала общий фид с двадцати записей до десяти.
+*/
+export function getRecentPosts(limit: number): Promise<PostWithDetails[]> {
   return prisma.post.findMany({
     ...postWithDetails,
-    orderBy: { createdAt: "desc" },
-    take: FEED_PAGE_SIZE,
+    orderBy: feedOrderBy,
+    take: limit,
   });
+}
+
+/*
+  Обложки для стены на первом экране. Раньше их доставали из уже загруженной
+  ленты, но лента ужалась до десяти записей — стене такого набора мало, она
+  зациклилась бы на нескольких картинках. Запрос отдельный и дешёвый: только
+  адреса, без самих записей и их связей.
+*/
+export async function getRecentArtworks(limit = 60): Promise<string[]> {
+  const rows = await prisma.postTrack.findMany({
+    take: limit,
+    orderBy: { post: { createdAt: "desc" } },
+    select: { track: { select: { artworkUrl: true } } },
+  });
+
+  return rows
+    .map((row) => row.track.artworkUrl)
+    .filter((url): url is string => url !== null);
 }
 
 export function getPostsByUsername(username: string): Promise<PostWithDetails[]> {
@@ -87,13 +176,14 @@ export function isFollowing(followerId: string, followingId: string): Promise<bo
     .then(Boolean);
 }
 
-export function getFollowingFeedPosts(userId: string): Promise<PostWithDetails[]> {
-  return prisma.post.findMany({
-    ...postWithDetails,
-    where: { author: { followers: { some: { followerId: userId } } } },
-    orderBy: { createdAt: "desc" },
-    take: FEED_PAGE_SIZE,
-  });
+export function getFollowingFeedPosts(
+  userId: string,
+  cursor?: string,
+): Promise<FeedPage> {
+  return getFeedPage(
+    { author: { followers: { some: { followerId: userId } } } },
+    cursor,
+  );
 }
 
 const commentWithAuthor = {

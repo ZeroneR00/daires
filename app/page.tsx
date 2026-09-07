@@ -1,8 +1,10 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { getFeedPosts, getLikedPostIds } from "@/lib/posts";
+import { getFeedPosts, getLikedPostIds, getRecentArtworks } from "@/lib/posts";
 import { getSiteStats } from "@/lib/stats";
 import { PostCard } from "@/components/PostCard";
+import { FeedLoader } from "@/components/FeedLoader";
+import { loadMoreFeed } from "@/lib/feed-actions";
 import { HomeHero } from "@/components/HomeHero";
 import { Groove } from "@/components/Groove";
 import { artworkAtSize } from "@/lib/artwork";
@@ -12,11 +14,13 @@ export const dynamic = "force-dynamic";
 const cardClassName = "rounded-card border border-line bg-surface p-6";
 
 export default async function Home() {
-  const [session, posts, siteStats] = await Promise.all([
+  const [session, feed, siteStats, recentArtworks] = await Promise.all([
     auth.api.getSession({ headers: await headers() }),
     getFeedPosts(),
     getSiteStats(),
+    getRecentArtworks(),
   ]);
+  const posts = feed.posts;
   const likedPostIds = session
     ? await getLikedPostIds(
         session.user.id,
@@ -24,12 +28,12 @@ export default async function Home() {
       )
     : new Set<string>();
 
-  // Стена на первом экране собирается из обложек самой ленты — отдельного
-  // запроса не нужно, посты уже загружены выше.
+  // Стена на первом экране собирается из обложек последних записей. Своим
+  // запросом, а не из ленты: лента отдаёт первой порцией десяток записей, и
+  // стене такого набора не хватило бы — она зациклилась бы на пяти картинках.
   const artworks = Array.from(
     new Set(
-      posts
-        .flatMap((post) => post.tracks.map((t) => t.track.artworkUrl))
+      recentArtworks
         .map((url) => artworkAtSize(url, 200))
         .filter((url): url is string => url !== null),
     ),
@@ -57,18 +61,32 @@ export default async function Home() {
                 showMark={index % 2 === 0}
               />
             ))}
+
+            {/*
+              Хвост ленты внутри того же контейнера, что и карточки: подгружённые
+              записи должны встать в общий ритм `gap-4`, а не отдельной пачкой.
+              Знак конца ленты рисует он же — но только когда записи правда
+              кончились.
+            */}
+            <FeedLoader
+              initialCursor={feed.nextCursor}
+              initialIndex={posts.length}
+              loadMore={loadMoreFeed}
+            />
           </div>
         ) : (
-          <div className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-card border border-dashed border-line p-8 text-center">
-            <p className="font-serif text-lg text-ink">Здесь пока тихо</p>
-            <p className="text-sm text-muted">
-              Лента оживёт, когда появится первая запись.
-            </p>
-          </div>
-        )}
+          <>
+            <div className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-card border border-dashed border-line p-8 text-center">
+              <p className="font-serif text-lg text-ink">Здесь пока тихо</p>
+              <p className="text-sm text-muted">
+                Лента оживёт, когда появится первая запись.
+              </p>
+            </div>
 
-        {/* Знак закрывает ленту: «записи кончились», а не обрыв в пустоту */}
-        <Groove className="pt-2" />
+            {/* Знак закрывает ленту: «записи кончились», а не обрыв в пустоту */}
+            <Groove className="pt-2" />
+          </>
+        )}
       </main>
 
       <aside className="flex w-full shrink-0 flex-col gap-4 sm:w-72">

@@ -8,7 +8,12 @@ import { prisma } from "@/lib/prisma";
 import { generateUniqueSlugForAuthor } from "@/lib/slug";
 import { postInputSchema, type PostInput } from "@/lib/post-schema";
 import { attachTracksToPost } from "@/lib/post-mutations";
-import { searchTracks, TrackSearchError, type NormalizedTrack } from "@/lib/track-api";
+import {
+  getTopTracks,
+  searchTracks,
+  TrackSearchError,
+  type NormalizedTrack,
+} from "@/lib/track-api";
 
 export async function searchTracksAction(query: string): Promise<NormalizedTrack[]> {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -21,6 +26,28 @@ export async function searchTracksAction(query: string): Promise<NormalizedTrack
   } catch (error) {
     if (error instanceof TrackSearchError) {
       throw new Error("Не удалось выполнить поиск треков, попробуй ещё раз");
+    }
+    throw error;
+  }
+}
+
+/*
+  Гарда та же, что у поиска, хотя чарт — данные публичные: экшен всё равно
+  публичный POST-эндпоинт, и держать в нём два разных правила доступа значит
+  однажды перепутать, какое где. Заодно это не даёт превратить сайт в чужой
+  прокси к Apple.
+*/
+export async function topTracksAction(): Promise<NormalizedTrack[]> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) {
+    throw new Error("Нужно войти, чтобы смотреть треки");
+  }
+
+  try {
+    return await getTopTracks();
+  } catch (error) {
+    if (error instanceof TrackSearchError) {
+      throw new Error("Не удалось загрузить чарт");
     }
     throw error;
   }

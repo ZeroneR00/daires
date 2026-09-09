@@ -43,7 +43,7 @@ export default async function AdminOverviewPage() {
     note?: string;
     href?: string;
   }[] = [
-    { label: "Пользователей", value: overview.userCount, note: `из них пишут: ${overview.authorCount}` },
+    { label: "Пользователей", value: overview.userCount, note: `из них пишут: ${overview.authorCount}`, href: "/admin/users" },
     { label: "Новых за неделю", value: overview.newUserCount },
     { label: "Записей", value: overview.postCount, note: `за неделю: ${overview.newPostCount}`, href: "/admin/posts" },
     { label: "Комментариев", value: overview.commentCount, href: "/admin/comments" },

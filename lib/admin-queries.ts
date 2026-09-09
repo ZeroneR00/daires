@@ -284,3 +284,187 @@ export async function getPostForDeletion(postId: string) {
     },
   });
 }
+
+/*
+  ─── Пользователи ──────────────────────────────────────────────────────────
+*/
+
+const adminUserRow = {
+  id: true,
+  username: true,
+  name: true,
+  email: true,
+  role: true,
+  avatarUrl: true,
+  createdAt: true,
+  _count: { select: { posts: true, comments: true } },
+} satisfies Prisma.UserSelect;
+
+export type AdminUserRow = Prisma.UserGetPayload<{
+  select: typeof adminUserRow;
+}>;
+
+export async function getAdminUsersPage(params: {
+  page: number;
+  q?: string;
+}): Promise<AdminPage<AdminUserRow>> {
+  /*
+    Поиск сразу по трём полям через OR — и снова `contains`, а не
+    полнотекстовый поиск из lib/search.ts. Довод тот же, что у записей, плюс
+    два своих: FTS по пользователям стоит на конфиге `simple`, то есть матчит
+    слова целиком («zer» не найдёт «ZeroneR»), а email в тот индекс не входит
+    вовсе — а модератору чаще всего дают именно кусок адреса или ника.
+
+    Email тут ищется, но НЕ показывается никому, кроме админа: страница лежит
+    под `requireAdmin()`, наружу это поле не уходит ни в одном публичном
+    запросе.
+  */
+  const where: Prisma.UserWhereInput = params.q
+    ? {
+        OR: [
+          { username: { contains: params.q, mode: "insensitive" } },
+          { name: { contains: params.q, mode: "insensitive" } },
+          { email: { contains: params.q, mode: "insensitive" } },
+        ],
+      }
+    : {};
+
+  const [rows, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (params.page - 1) * ADMIN_PAGE_SIZE,
+      take: ADMIN_PAGE_SIZE,
+      select: adminUserRow,
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  return { rows, total, page: params.page, pageCount: pageCountOf(total) };
+}
+
+/*
+  Всё, что погибнет вместе с пользователем, — числами.
+
+  Считаем не «сколько у него всего», а сколько строк реально снесёт каскад,
+  и отдельно выделяем ЧУЖОЕ. Это главное, что страница подтверждения обязана
+  сказать вслух: удаление человека уносит и чужие комментарии под его
+  записями, и чужие сообщения в общих с ним диалогах, и чужие лайки на его
+  записях. Из схемы это видно только тому, кто держит в голове две ступени
+  каскада (`User → Post → Comment`, `User → Conversation → Message`).
+
+  Разбиение «своё / чужое» непересекающееся: свои комментарии — все, где он
+  автор (в том числе под своими же записями), чужие — под его записями за
+  вычетом его собственных. Складывать их можно без риска задвоения.
+*/
+export interface UserDeletionSummary {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  role: string;
+  avatarUrl: string | null;
+  createdAt: Date;
+  posts: number;
+  ownComments: number;
+  foreignComments: number;
+  ownLikes: number;
+  foreignLikes: number;
+  following: number;
+  followers: number;
+  friendRequests: number;
+  friendships: number;
+  conversations: number;
+  ownMessages: number;
+  foreignMessages: number;
+  sessions: number;
+  accounts: number;
+}
+
+export async function getUserForDeletion(
+  userId: string,
+): Promise<UserDeletionSummary | null> {
+  /*
+    Прямые связи берём одним `_count` — Prisma разворачивает его в
+    коррелированные подзапросы к одной строке, это дешевле десятка отдельных
+    `count()`. Двухступенчатое (чужое) так не сосчитать: `_count` умеет только
+    считать связь по одному ребру, а тут нужно «через запись» и «через диалог».
+  */
+  const [user, foreignComments, foreignLikes, foreignMessages] =
+    await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          email: true,
+          role: true,
+          avatarUrl: true,
+          createdAt: true,
+          _count: {
+            select: {
+              posts: true,
+              comments: true,
+              likes: true,
+              following: true,
+              followers: true,
+              sentFriendRequests: true,
+              receivedFriendRequests: true,
+              friendshipsA: true,
+              friendshipsB: true,
+              conversationsA: true,
+              conversationsB: true,
+              sentMessages: true,
+              sessions: true,
+              accounts: true,
+            },
+          },
+        },
+      }),
+      prisma.comment.count({
+        where: { post: { authorId: userId }, authorId: { not: userId } },
+      }),
+      prisma.like.count({
+        where: { post: { authorId: userId }, userId: { not: userId } },
+      }),
+      prisma.message.count({
+        where: {
+          conversation: {
+            OR: [{ userAId: userId }, { userBId: userId }],
+          },
+          senderId: { not: userId },
+        },
+      }),
+    ]);
+
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatarUrl: user.avatarUrl,
+    createdAt: user.createdAt,
+    posts: user._count.posts,
+    ownComments: user._count.comments,
+    foreignComments,
+    ownLikes: user._count.likes,
+    foreignLikes,
+    following: user._count.following,
+    followers: user._count.followers,
+    // Заявки и дружбы — двусторонние модели с двумя ролями, поэтому у обеих
+    // складываем обе стороны. Тот же приём, что в счётчике «N друзей» на
+    // публичном профиле: одной парой Prisma при self-relation не считает.
+    friendRequests:
+      user._count.sentFriendRequests + user._count.receivedFriendRequests,
+    friendships: user._count.friendshipsA + user._count.friendshipsB,
+    conversations: user._count.conversationsA + user._count.conversationsB,
+    ownMessages: user._count.sentMessages,
+    foreignMessages,
+    sessions: user._count.sessions,
+    accounts: user._count.accounts,
+  };
+}

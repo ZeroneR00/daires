@@ -20,6 +20,7 @@ const sections = [
   { href: "/admin", label: "Обзор" },
   { href: "/admin/posts", label: "Записи" },
   { href: "/admin/comments", label: "Комментарии" },
+  { href: "/admin/users", label: "Пользователи" },
 ];
 
 export function AdminNav() {

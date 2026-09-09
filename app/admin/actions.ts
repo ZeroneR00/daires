@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getAdminSession } from "@/lib/admin";
+import { ADMIN_ROLE, USER_ROLE, getAdminSession } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import { toDayKey } from "@/lib/format-date";
 
 /*
@@ -92,4 +93,124 @@ export async function deletePostAsAdmin(formData: FormData): Promise<void> {
     оставив пользователя на странице подтверждения удалённой записи.
   */
   redirect("/admin/posts");
+}
+
+/*
+  ─── Пользователи ──────────────────────────────────────────────────────────
+*/
+
+export async function setUserRole(formData: FormData): Promise<void> {
+  const session = await getAdminSession();
+  if (!session) return;
+
+  const userId = formData.get("userId");
+  const role = formData.get("role");
+  if (typeof userId !== "string" || typeof role !== "string") return;
+
+  /*
+    Белый список ролей — не формальность. Значение приходит скрытым полем
+    формы, то есть управляется отправителем целиком: без этой строки любой
+    админ (а в перспективе — модератор) записал бы в колонку произвольную
+    строку, и `role === ADMIN_ROLE` в гарде начал бы врать молча.
+  */
+  if (role !== ADMIN_ROLE && role !== USER_ROLE) return;
+
+  /*
+    Самозащита: свою роль не трогаем вообще. Сформулировано шире, чем
+    «нельзя снять роль себе», нарочно — так правило не зависит от того,
+    что прислали в поле, и не придётся его чинить, когда ролей станет три.
+    Иначе последний админ разжалует сам себя и вернуть админку можно будет
+    только скриптом `npm run make-admin`.
+  */
+  if (userId === session.user.id) return;
+
+  /*
+    `updateMany`, а не `update`: второй бросает P2025 на исчезнувшей строке,
+    а у void-формы нет места под ошибку — вместо списка человек увидел бы
+    страницу ошибки Next. Здесь пропавший пользователь просто ничего
+    не меняет.
+  */
+  await prisma.user.updateMany({ where: { id: userId }, data: { role } });
+
+  revalidatePath("/admin/users");
+}
+
+export async function deleteUserAsAdmin(formData: FormData): Promise<void> {
+  const session = await getAdminSession();
+  if (!session) return;
+
+  const userId = formData.get("userId");
+  const confirmUsername = formData.get("confirmUsername");
+  if (typeof userId !== "string") return;
+
+  // Себя не удаляем — админка осталась бы без входа.
+  if (userId === session.user.id) return;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { username: true, role: true },
+  });
+  if (!user) return;
+
+  /*
+    Другого админа — только разжаловав. Лишний шаг здесь дешевле, чем
+    случайно снесённый коллега: восстановления нет, аккаунт уходит вместе
+    со всем, что он написал.
+  */
+  if (user.role === ADMIN_ROLE) return;
+
+  /*
+    Сверка ника — ЗДЕСЬ, а не на странице подтверждения: страница это UI,
+    а экшен это публичный POST, и в него приходят прямо, минуя форму.
+    Сравнение без учёта регистра: ник уникален и в форме `signup` ограничен
+    латиницей, так что «ZeroneR» и «zeroner» — заведомо один человек,
+    а придираться к регистру на страшной форме незачем.
+  */
+  const typed = typeof confirmUsername === "string" ? confirmUsername.trim() : "";
+  if (typed.toLowerCase() !== user.username.toLowerCase()) {
+    redirect(`/admin/users/${userId}/delete?error=confirm`);
+  }
+
+  /*
+    Аватар лежит в бакете Supabase по пути, равному userId, — каскад базы
+    туда не дотягивается, и без этой строки файл остался бы сиротой навсегда.
+    Ошибку глотаем: недоступное хранилище не повод оставить аккаунт живым,
+    а лишний файл в бакете безвреден. Try/catch тут безопасен — redirect
+    ниже, вне блока.
+  */
+  try {
+    await supabase.storage.from("avatars").remove([userId]);
+  } catch {
+    // Файла могло и не быть — аватар необязателен.
+  }
+
+  /*
+    Один delete уносит всё: записи (а с ними чужие комментарии и лайки),
+    свои комментарии и лайки, подписки в обе стороны, заявки, дружбы,
+    диалоги (а с ними чужие сообщения), сессии и аккаунты. Всё это описано
+    в схеме как onDelete: Cascade, так что руками ничего доудалять не надо —
+    и, что важнее, нельзя: ручная зачистка разъехалась бы со схемой при
+    первой же новой связи.
+  */
+  await prisma.user.delete({ where: { id: userId } });
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin");
+  revalidatePath("/admin/posts");
+  revalidatePath("/admin/comments");
+  revalidatePath("/");
+  /*
+    Тип "layout" на литеральном пути: гасим не только страницу дневника,
+    но и все вложенные — страницы его записей, список друзей, RSS. Иначе
+    из клиентского Router Cache браузер показал бы запись человека,
+    которого уже нет.
+
+    Чего этим НЕ достать: страниц суток `/day/<дата>`, где лежали его
+    записи. Перечислить их можно было бы, собрав даты до удаления, но их
+    столько же, сколько дней он писал, — а страница /day и так динамическая
+    и пересоберётся при первом заходе с сервера.
+  */
+  revalidatePath(`/u/${user.username}`, "layout");
+
+  redirect("/admin/users");
 }

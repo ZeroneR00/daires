@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatPostDate, formatPostDateParts } from "@/lib/format-date";
+import { formatPostDate, formatPostDateParts, toDayKey } from "@/lib/format-date";
 import { artworkAtSize } from "@/lib/artwork";
 import { PostTrackList } from "@/components/PostTrackList";
 import { Avatar } from "@/components/Avatar";
@@ -37,6 +37,20 @@ export function PostCard({
   const dateIso = post.createdAt.toISOString();
   const { day, month, year } = formatPostDateParts(post.createdAt);
 
+  /*
+    Дата ведёт не в запись, а в её день: в саму запись отсюда и так три пути
+    (обложка, название, «Читать»), а четвёртый ничего не добавлял.
+
+    Охват дня решает контекст страницы, и он уже выражен пропом showAuthor:
+    false стоит ровно там, где страница и так про одного автора — в его
+    дневнике. Отдельный проп «охват дня» пришлось бы выставлять всегда вместе
+    с этим, а два пропа, обязанные совпадать, однажды разойдутся.
+  */
+  const dayKey = toDayKey(post.createdAt);
+  const dayHref = showAuthor
+    ? `/day/${dayKey}`
+    : `/day/${dayKey}?u=${encodeURIComponent(post.author.username)}`;
+
   // Первый трек играет роль обложки записи, но из списка ниже не выпадает:
   // иначе включить его отдельно было бы неоткуда.
   const hero = post.tracks[0]?.track;
@@ -58,8 +72,8 @@ export function PostCard({
         Ниже этого порога дата остаётся в шапке карточки (ссылка с lg:hidden).
       */}
       <Link
-        href={postHref}
-        aria-label={dateLabel}
+        href={dayHref}
+        aria-label={`Записи за ${dateLabel}`}
         className="group hidden w-14 shrink-0 flex-col items-center justify-start gap-1 border-r border-rule-margin py-5 font-serif leading-none text-muted transition-colors hover:text-accent lg:flex"
       >
         <time dateTime={dateIso} className="flex flex-col items-center gap-1">
@@ -99,7 +113,8 @@ export function PostCard({
             <span />
           )}
           <Link
-            href={postHref}
+            href={dayHref}
+            aria-label={`Записи за ${dateLabel}`}
             className="shrink-0 transition-colors hover:text-accent lg:hidden"
           >
             <time dateTime={dateIso}>{dateLabel}</time>

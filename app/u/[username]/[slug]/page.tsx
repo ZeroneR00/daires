@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { formatPostDate } from "@/lib/format-date";
+import { formatPostDate, toDayKey } from "@/lib/format-date";
 import { artworkAtSize } from "@/lib/artwork";
 import { getPostBySlug, getCommentsForPost, getLikedPostIds } from "@/lib/posts";
 import { buildQueue } from "@/lib/track-queue";
@@ -59,21 +59,44 @@ export default async function PostPage({ params }: PostPageProps) {
           { "--glow": heroArtwork ? `url(${heroArtwork})` : "none" } as React.CSSProperties
         }
       >
+        {/*
+          Три ссылки вместо одной: дата ведёт в свой день, и обернуть её
+          отдельной ссылкой внутри ссылки на автора нельзя — <a> внутри <a>
+          невалиден, ровно как <button> внутри <a> в строках заявок в друзья.
+          Вид при этом прежний: тот же ряд «аватар — колонка из двух строк».
+
+          Аватар — ссылка-дубль имени, поэтому спрятан от клавиатуры и
+          скринридера: иначе на одного и того же автора появлялись бы две
+          одинаковые остановки табом подряд.
+        */}
         <header className="flex items-center justify-between gap-3 text-sm text-muted">
-          <Link
-            href={`/u/${post.author.username}`}
-            className="flex min-w-0 items-center gap-2.5 transition-colors hover:text-accent"
-          >
-            <Avatar url={post.author.avatarUrl} size={36} />
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Link
+              href={`/u/${post.author.username}`}
+              aria-hidden
+              tabIndex={-1}
+              className="shrink-0"
+            >
+              <Avatar url={post.author.avatarUrl} size={36} />
+            </Link>
             <span className="min-w-0">
-              <span className="block truncate font-medium text-ink">
+              <Link
+                href={`/u/${post.author.username}`}
+                className="block truncate font-medium text-ink transition-colors hover:text-accent"
+              >
                 {post.author.name}
-              </span>
-              <span className="block truncate">
-                {formatPostDate(post.createdAt)}
-              </span>
+              </Link>
+              <Link
+                href={`/day/${toDayKey(post.createdAt)}?u=${encodeURIComponent(post.author.username)}`}
+                aria-label={`Записи за ${formatPostDate(post.createdAt)}`}
+                className="block truncate transition-colors hover:text-accent"
+              >
+                <time dateTime={post.createdAt.toISOString()}>
+                  {formatPostDate(post.createdAt)}
+                </time>
+              </Link>
             </span>
-          </Link>
+          </div>
 
           {isOwner && (
             <Link

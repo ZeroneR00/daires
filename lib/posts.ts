@@ -110,6 +110,30 @@ export async function getRecentArtworks(limit = 60): Promise<string[]> {
     .filter((url): url is string => url !== null);
 }
 
+/*
+  Записи за одни сутки. Границы приходят готовыми из `dayKeyToRange` — этот
+  слой про пояса ничего не знает и знать не должен, иначе решение «какой день
+  считать днём» размазалось бы по двум файлам.
+
+  `lt`, а не `lte`: интервал полуоткрытый, иначе запись, созданная ровно в
+  полночь, попала бы разом в двое суток. `take` нет намеренно — сутки и так
+  ограничивают выдачу, ровно как дневник в `getPostsByUsername`.
+*/
+export function getPostsByDay(
+  start: Date,
+  end: Date,
+  username?: string,
+): Promise<PostWithDetails[]> {
+  return prisma.post.findMany({
+    ...postWithDetails,
+    where: {
+      createdAt: { gte: start, lt: end },
+      ...(username ? { author: { username } } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export function getPostsByUsername(username: string): Promise<PostWithDetails[]> {
   return prisma.post.findMany({
     ...postWithDetails,

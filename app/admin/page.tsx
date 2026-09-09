@@ -34,17 +34,19 @@ export default async function AdminOverviewPage() {
   ]);
 
   /*
-    Ссылок на цифрах пока нет: разделы (записи, комментарии, пользователи,
-    треки) приезжают следующими этапами, а мёртвая ссылка хуже её отсутствия.
-    Когда раздел появится — сюда добавляется `href`, и плитка становится
-    ссылкой. Ссылки в списках ниже ведут на публичные страницы, которые
-    существуют уже сейчас.
+    `href` есть только у тех плиток, чей раздел уже существует: мёртвая ссылка
+    хуже её отсутствия. Пользователи и треки получат его на своих этапах.
   */
-  const tiles = [
+  const tiles: {
+    label: string;
+    value: number;
+    note?: string;
+    href?: string;
+  }[] = [
     { label: "Пользователей", value: overview.userCount, note: `из них пишут: ${overview.authorCount}` },
     { label: "Новых за неделю", value: overview.newUserCount },
-    { label: "Записей", value: overview.postCount, note: `за неделю: ${overview.newPostCount}` },
-    { label: "Комментариев", value: overview.commentCount },
+    { label: "Записей", value: overview.postCount, note: `за неделю: ${overview.newPostCount}`, href: "/admin/posts" },
+    { label: "Комментариев", value: overview.commentCount, href: "/admin/comments" },
     { label: "Лайков", value: overview.likeCount },
     { label: "Треков", value: overview.trackCount, note: `ни в одной записи: ${overview.orphanTrackCount}` },
   ];
@@ -55,9 +57,18 @@ export default async function AdminOverviewPage() {
         {tiles.map((tile) => (
           <div key={tile.label} className="flex flex-col gap-0.5">
             <span className="text-xs text-muted">{tile.label}</span>
-            <span className="font-serif text-2xl leading-none text-ink">
-              {tile.value}
-            </span>
+            {tile.href ? (
+              <Link
+                href={tile.href}
+                className="font-serif text-2xl leading-none text-ink transition-colors hover:text-accent"
+              >
+                {tile.value}
+              </Link>
+            ) : (
+              <span className="font-serif text-2xl leading-none text-ink">
+                {tile.value}
+              </span>
+            )}
             {tile.note && (
               <span className="text-xs text-muted">{tile.note}</span>
             )}

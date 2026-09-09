@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
 /*
@@ -127,4 +128,159 @@ export async function getAdminRecentActivity(): Promise<AdminRecentActivity> {
   ]);
 
   return { users, posts };
+}
+
+/*
+  ─── Списки с пагинацией ───────────────────────────────────────────────────
+
+  Пагинация страницами (`?page=N` + skip/take) в проекте больше нигде не
+  встречается — ленты листаются курсором, и в AGENTS.md прямо записано, что
+  страничной пагинации нет намеренно. Здесь это не нарушение, а другой случай.
+
+  Довод против страниц звучал так: адресуемость, ради которой их обычно берут,
+  у ленты уже есть сбоку — /day, дневник автора, поиск, RSS. У админского
+  списка боковой адресуемости нет вообще, зато нужны две вещи, которых курсор
+  не даёт: ответ «сколько всего» и прыжок сразу на седьмую страницу. А главная
+  беда OFFSET'а — дрейф строк при вставке новых — модератору безвредна:
+  он разбирает список, а не читает ленту.
+
+  Порог деградации: OFFSET заставляет Postgres пройти и выбросить skip строк,
+  так что на тысячах страниц это станет медленным. Тогда — курсор, как в
+  getFeedPage.
+*/
+
+export const ADMIN_PAGE_SIZE = 30;
+
+export interface AdminPage<T> {
+  rows: T[];
+  total: number;
+  page: number;
+  pageCount: number;
+}
+
+/**
+ * Номер страницы из query-параметра.
+ *
+ * Мусор (`?page=abc`, `?page=-3`) — это тихо первая страница, а НЕ `notFound()`:
+ * query-параметр не идентичность. Тем он и отличается от `/day/[date]`, где
+ * ключ дня как раз идентичность и кривой ключ обязан давать 404.
+ */
+export function parsePageParam(value: string | undefined): number {
+  return Math.max(1, Number.parseInt(value ?? "1", 10) || 1);
+}
+
+function pageCountOf(total: number): number {
+  return Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+}
+
+/*
+  Тонкий row-тип вместо общего include `postWithDetails` из lib/posts.ts:
+  тот тянет автора, ВСЕ треки записи и `_count`, а модератору в строке нужны
+  дата, автор, отрывок и три числа. На тридцати строках разница — сотни
+  лишних строк из post_track.
+
+  `_count` при этом оставляем: это агрегирующий подзапрос, а не выборка самих
+  комментариев с лайками, и именно он говорит, сколько всего погибнет
+  при удалении.
+*/
+const adminPostRow = {
+  id: true,
+  slug: true,
+  text: true,
+  createdAt: true,
+  author: { select: { username: true, name: true } },
+  _count: { select: { comments: true, likes: true, tracks: true } },
+} satisfies Prisma.PostSelect;
+
+export type AdminPostRow = Prisma.PostGetPayload<{
+  select: typeof adminPostRow;
+}>;
+
+export async function getAdminPostsPage(params: {
+  page: number;
+  q?: string;
+  author?: string;
+}): Promise<AdminPage<AdminPostRow>> {
+  const where: Prisma.PostWhereInput = {};
+
+  // `contains` + `mode: "insensitive"`, а не полнотекстовый поиск из
+  // lib/search.ts. Расхождение сознательное: FTS матчит слова целиком
+  // (по «zer» не найдётся «ZeroneR») и заточен под релевантность, а модератору
+  // нужно ровно обратное — найти по куску строки всё, что её содержит.
+  if (params.q) {
+    where.text = { contains: params.q, mode: "insensitive" };
+  }
+  if (params.author) {
+    where.author = { username: { equals: params.author, mode: "insensitive" } };
+  }
+
+  const [rows, total] = await Promise.all([
+    prisma.post.findMany({
+      where,
+      // Пара `createdAt` + `id`: без второго ключа порядок внутри одной
+      // миллисекунды не определён, и строка на границе страниц может
+      // задвоиться или пропасть.
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (params.page - 1) * ADMIN_PAGE_SIZE,
+      take: ADMIN_PAGE_SIZE,
+      select: adminPostRow,
+    }),
+    prisma.post.count({ where }),
+  ]);
+
+  return { rows, total, page: params.page, pageCount: pageCountOf(total) };
+}
+
+const adminCommentRow = {
+  id: true,
+  text: true,
+  createdAt: true,
+  author: { select: { username: true, name: true } },
+  post: {
+    select: { slug: true, author: { select: { username: true } } },
+  },
+} satisfies Prisma.CommentSelect;
+
+export type AdminCommentRow = Prisma.CommentGetPayload<{
+  select: typeof adminCommentRow;
+}>;
+
+export async function getAdminCommentsPage(params: {
+  page: number;
+  q?: string;
+}): Promise<AdminPage<AdminCommentRow>> {
+  const where: Prisma.CommentWhereInput = params.q
+    ? { text: { contains: params.q, mode: "insensitive" } }
+    : {};
+
+  const [rows, total] = await Promise.all([
+    prisma.comment.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (params.page - 1) * ADMIN_PAGE_SIZE,
+      take: ADMIN_PAGE_SIZE,
+      select: adminCommentRow,
+    }),
+    prisma.comment.count({ where }),
+  ]);
+
+  return { rows, total, page: params.page, pageCount: pageCountOf(total) };
+}
+
+/**
+ * Запись для страницы подтверждения удаления: тут, в отличие от строки списка,
+ * нужен полный текст — модератор должен видеть, что именно гибнет.
+ */
+export async function getPostForDeletion(postId: string) {
+  return prisma.post.findUnique({
+    where: { id: postId },
+    select: {
+      id: true,
+      slug: true,
+      text: true,
+      createdAt: true,
+      author: { select: { username: true, name: true } },
+      _count: { select: { comments: true, likes: true, tracks: true } },
+    },
+  });
 }

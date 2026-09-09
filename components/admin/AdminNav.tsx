@@ -16,7 +16,11 @@ import { usePathname } from "next/navigation";
   Жалобы · Треки.
 */
 
-const sections = [{ href: "/admin", label: "Обзор" }];
+const sections = [
+  { href: "/admin", label: "Обзор" },
+  { href: "/admin/posts", label: "Записи" },
+  { href: "/admin/comments", label: "Комментарии" },
+];
 
 export function AdminNav() {
   const pathname = usePathname();
@@ -24,9 +28,13 @@ export function AdminNav() {
   return (
     <nav className="flex flex-wrap items-center gap-1">
       {sections.map((section) => {
-        // Точное сравнение, а не startsWith: иначе «Обзор» (`/admin`) горел бы
-        // активным на каждой вложенной странице раздела.
-        const active = pathname === section.href;
+        // «Обзор» сравниваем точно, остальные — по префиксу: иначе `/admin`
+        // горел бы активным во всех разделах сразу, а «Записи» гасли бы на
+        // вложенной странице подтверждения удаления.
+        const active =
+          section.href === "/admin"
+            ? pathname === "/admin"
+            : pathname.startsWith(section.href);
 
         return (
           <Link

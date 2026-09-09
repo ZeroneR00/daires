@@ -21,6 +21,22 @@ model User {
   username               String          @unique
   bio                    String?
   avatarUrl              String?
+  // Роль: "user" или "admin". NOT NULL с дефолтом, а не String?: у колонки
+  // всегда есть значение, и ни один путь в коде не может записать сюда NULL.
+  // В Postgres 11+ ADD COLUMN NOT NULL DEFAULT таблицу не переписывает, так
+  // что миграция дешёвая даже на живой базе.
+  //
+  // Проверено 2026-09-09: в TypeScript через Better Auth роль всё равно
+  // приезжает как `string | null | undefined` (поле объявлено там
+  // `required: false`), несмотря на NOT NULL в базе. Гарду это не мешает —
+  // он сравнивает `=== "admin"`, а не разыменовывает; каст `as` не нужен.
+  //
+  // Индекса по role нет намеренно: кардинальность 2, админ в базе один —
+  // планировщик всё равно возьмёт seq scan. Не добавлять «для симметрии».
+  //
+  // И не enum: добавление роли «модератор» тогда стало бы DDL-миграцией
+  // вместо одной строки в коде.
+  role                   String          @default("user")
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
   sessions               Session[]

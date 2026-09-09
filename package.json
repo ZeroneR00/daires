@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "make-admin": "node scripts/make-admin.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { REPORT_STATUS, type ReportStatus } from "@/lib/report-schema";
 
 /*
   Все читающие запросы админки. Мутации живут отдельно (`app/admin/actions.ts`),
@@ -26,6 +27,7 @@ export interface AdminOverview {
   likeCount: number;
   trackCount: number;
   orphanTrackCount: number;
+  openReportCount: number;
 }
 
 /**
@@ -49,6 +51,7 @@ export async function getAdminOverview(): Promise<AdminOverview> {
     likeCount,
     trackCount,
     orphanTrackCount,
+    openReportCount,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { posts: { some: {} } } }),
@@ -64,10 +67,11 @@ export async function getAdminOverview(): Promise<AdminOverview> {
     // PostTrack, а сам трек остаётся — он кэш метаданных по externalId,
     // а не часть записи. Раздел «Треки» (этап 6) — гигиена, не обязанность.
     prisma.track.count({ where: { posts: { none: {} } } }),
+    // Открытые жалобы — единственный счётчик сводки, который зовёт к действию,
+    // а не описывает состояние. Индекс `[status, createdAt]` покрывает его
+    // целиком: фильтр по первому полю пары.
+    prisma.report.count({ where: { status: REPORT_STATUS.open } }),
   ]);
-
-  // Жалобы (`open`) добавятся сюда на этапе 5 — десятым счётчиком в тот же
-  // Promise.all, отдельного запроса на дашборде им не понадобится.
 
   return {
     userCount,
@@ -79,6 +83,7 @@ export async function getAdminOverview(): Promise<AdminOverview> {
     likeCount,
     trackCount,
     orphanTrackCount,
+    openReportCount,
   };
 }
 
@@ -467,4 +472,84 @@ export async function getUserForDeletion(
     sessions: user._count.sessions,
     accounts: user._count.accounts,
   };
+}
+
+/*
+  ─── Жалобы ────────────────────────────────────────────────────────────────
+
+  Строка списка тянет и запись, и комментарий — заполнено всегда ровно одно
+  (инвариант держит CHECK в миграции, см. комментарий у модели `Report`).
+  Оба вложения дают адрес публичной страницы: у жалобы на комментарий он
+  собирается из записи, под которой тот лежит.
+
+  Текст цели тянем прямо в строку, а не отдельной страницей «разобрать»:
+  чтобы решить, жалоба ли это по делу, модератор должен видеть сам объект,
+  и уходить за ним со списка — лишний шаг на каждую строку.
+*/
+const adminReportRow = {
+  id: true,
+  reason: true,
+  status: true,
+  createdAt: true,
+  resolvedAt: true,
+  reporter: { select: { username: true, name: true } },
+  post: {
+    select: {
+      slug: true,
+      text: true,
+      author: { select: { username: true } },
+    },
+  },
+  comment: {
+    select: {
+      text: true,
+      author: { select: { username: true } },
+      post: { select: { slug: true, author: { select: { username: true } } } },
+    },
+  },
+} satisfies Prisma.ReportSelect;
+
+export type AdminReportRow = Prisma.ReportGetPayload<{
+  select: typeof adminReportRow;
+}>;
+
+/**
+ * Список жалоб. `status: undefined` — показать все; по умолчанию страница
+ * просит `open`, потому что разбор идёт именно по ним.
+ *
+ * Сортировка — старые сверху (`asc`), в отличие от всех остальных списков
+ * админки: жалоба это очередь, а не лента, и первой разбирают ту, что дольше
+ * всех ждёт. Пара с `id` — по тому же доводу, что и везде.
+ */
+export async function getAdminReportsPage(params: {
+  page: number;
+  status?: ReportStatus;
+}): Promise<AdminPage<AdminReportRow>> {
+  const where: Prisma.ReportWhereInput = params.status
+    ? { status: params.status }
+    : {};
+
+  const [rows, total] = await Promise.all([
+    prisma.report.findMany({
+      where,
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      skip: (params.page - 1) * ADMIN_PAGE_SIZE,
+      take: ADMIN_PAGE_SIZE,
+      select: adminReportRow,
+    }),
+    prisma.report.count({ where }),
+  ]);
+
+  return { rows, total, page: params.page, pageCount: pageCountOf(total) };
+}
+
+/**
+ * Сколько жалоб ждёт разбора — для бейджа в навигации админки.
+ *
+ * Отдельный запрос, а не поле из `getAdminOverview()`: бейдж нужен в layout
+ * на всех страницах админки, а сводка считает десяток счётчиков и нужна
+ * только дашборду.
+ */
+export async function getOpenReportCount(): Promise<number> {
+  return prisma.report.count({ where: { status: REPORT_STATUS.open } });
 }

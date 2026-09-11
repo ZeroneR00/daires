@@ -21,9 +21,22 @@ const sections = [
   { href: "/admin/posts", label: "Записи" },
   { href: "/admin/comments", label: "Комментарии" },
   { href: "/admin/users", label: "Пользователи" },
+  { href: "/admin/reports", label: "Жалобы" },
 ];
 
-export function AdminNav() {
+/*
+  Число открытых жалоб приходит пропсом из layout, а не запросом отсюда:
+  компонент клиентский, в базу ему не сходить, а layout и так серверный.
+
+  Цифра, а не точка, — в отличие от значка меню в шапке сайта: там сигнал
+  «загляни», здесь очередь, и её длина решает, браться сейчас или потом.
+  Ноль не рисуем вовсе: пустая очередь — не новость.
+*/
+interface AdminNavProps {
+  openReportCount: number;
+}
+
+export function AdminNav({ openReportCount }: AdminNavProps) {
   const pathname = usePathname();
 
   return (
@@ -49,6 +62,11 @@ export function AdminNav() {
             }
           >
             {section.label}
+            {section.href === "/admin/reports" && openReportCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-accent px-1.5 text-xs font-medium text-accent-ink">
+                {openReportCount}
+              </span>
+            )}
           </Link>
         );
       })}

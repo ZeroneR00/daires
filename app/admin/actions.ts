@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ADMIN_ROLE, USER_ROLE, getAdminSession } from "@/lib/admin";
+import { REPORT_STATUS, isReportStatus } from "@/lib/report-schema";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { toDayKey } from "@/lib/format-date";
@@ -213,4 +214,39 @@ export async function deleteUserAsAdmin(formData: FormData): Promise<void> {
   revalidatePath(`/u/${user.username}`, "layout");
 
   redirect("/admin/users");
+}
+
+/**
+ * Разбор жалобы: перевод в `resolved`/`dismissed` (и обратно в `open`, если
+ * решение хочется отменить).
+ *
+ * Удаления самой жалобы нет: закрытая жалоба — это история разбора. А если
+ * модератор сносит сам объект, жалоба уходит каскадом и без этого экшена —
+ * поэтому `resolved` тут редкий гость, он для «претензия по делу, но удалять
+ * не буду».
+ */
+export async function resolveReport(formData: FormData): Promise<void> {
+  const session = await getAdminSession();
+  if (!session) return;
+
+  const reportId = formData.get("reportId");
+  const status = formData.get("status");
+  if (typeof reportId !== "string") return;
+
+  // Тот же довод, что у белого списка ролей: статус приезжает скрытым полем
+  // формы. Enum'а в базе нет, так что эта проверка — единственная.
+  if (!isReportStatus(status)) return;
+
+  await prisma.report.updateMany({
+    where: { id: reportId },
+    data: {
+      status,
+      // Дата разбора ставится один раз и снимается при возврате в `open` —
+      // иначе «закрыто такого-то» осталось бы висеть на открытой жалобе.
+      resolvedAt: status === REPORT_STATUS.open ? null : new Date(),
+    },
+  });
+
+  revalidatePath("/admin/reports");
+  revalidatePath("/admin");
 }

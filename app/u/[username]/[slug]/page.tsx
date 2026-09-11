@@ -13,7 +13,8 @@ import { Groove } from "@/components/Groove";
 import { LikeButton } from "@/components/LikeButton";
 import { CommentForm } from "@/components/CommentForm";
 import { CommentList } from "@/components/CommentList";
-import { createComment, deleteComment } from "./actions";
+import { ReportButton } from "@/components/ReportButton";
+import { createComment, createReport, deleteComment } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +149,7 @@ export default async function PostPage({ params }: PostPageProps) {
 
         {/* Простая линейка, а не знак: знак на этой странице стоит один раз —
             границей между записью и обсуждением, ниже */}
-        <div className="flex items-center gap-4 border-t border-line pt-4 text-sm text-muted">
+        <div className="flex flex-wrap items-center gap-4 border-t border-line pt-4 text-sm text-muted">
           {session ? (
             <LikeButton
               postId={post.id}
@@ -165,6 +166,15 @@ export default async function PostPage({ params }: PostPageProps) {
               <span aria-hidden className="text-base leading-none">♡</span>
               {post._count.likes}
             </Link>
+          )}
+
+          {/* Только залогиненному и только на чужое: жалоба привязана к автору,
+              так что анониму жаловаться нечем, а автору на себя незачем. Гость
+              при этом не видит и намёка, что такая кнопка бывает.
+              `flex-wrap` у ряда — ради раскрытой формы: она занимает всю
+              ширину и переезжает на свою строку, а не жмётся к счётчику. */}
+          {session && !isOwner && (
+            <ReportButton action={createReport.bind(null, { postId: post.id })} />
           )}
         </div>
       </article>
@@ -186,6 +196,7 @@ export default async function PostPage({ params }: PostPageProps) {
           comments={comments}
           currentUserId={session?.user.id}
           deleteAction={deleteComment}
+          reportAction={session ? createReport : undefined}
         />
 
         {session ? (

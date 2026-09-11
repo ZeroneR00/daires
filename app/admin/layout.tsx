@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { requireAdmin } from "@/lib/admin";
+import { getOpenReportCount } from "@/lib/admin-queries";
 import { AdminNav } from "@/components/admin/AdminNav";
 
 /*
@@ -32,13 +33,20 @@ export default async function AdminLayout({
 }) {
   await requireAdmin();
 
+  /*
+    Один лишний `count()` на страницу админки — цена бейджа очереди. В шапку
+    сайта такой счётчик не тащим по обратному доводу: там он выполнялся бы
+    у каждого посетителя на каждой смене маршрута ради цифры одному человеку.
+  */
+  const openReportCount = await getOpenReportCount();
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6">
       <header className="flex flex-col gap-4">
         <h1 className="font-serif text-2xl tracking-tight text-ink">
           Администрирование
         </h1>
-        <AdminNav />
+        <AdminNav openReportCount={openReportCount} />
       </header>
 
       {children}

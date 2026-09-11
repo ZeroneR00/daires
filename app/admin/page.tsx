@@ -49,11 +49,14 @@ export default async function AdminOverviewPage() {
     { label: "Комментариев", value: overview.commentCount, href: "/admin/comments" },
     { label: "Лайков", value: overview.likeCount },
     { label: "Треков", value: overview.trackCount, note: `ни в одной записи: ${overview.orphanTrackCount}` },
+    // Единственная плитка, которая зовёт к действию, а не описывает состояние,
+    // поэтому подпись говорит про очередь («ждут разбора»), а не про всего.
+    { label: "Жалоб", value: overview.openReportCount, note: "ждут разбора", href: "/admin/reports" },
   ];
 
   return (
     <div className="flex flex-col gap-10">
-      <section className="grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3 lg:grid-cols-6">
+      <section className="grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
         {tiles.map((tile) => (
           <div key={tile.label} className="flex flex-col gap-0.5">
             <span className="text-xs text-muted">{tile.label}</span>

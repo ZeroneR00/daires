@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { ADMIN_ROLE } from "@/lib/admin";
 import { getUserByUsername } from "@/lib/posts";
 import { SettingsForm } from "@/components/SettingsForm";
 import { AvatarUploadForm } from "@/components/AvatarUploadForm";
@@ -36,6 +38,33 @@ export default async function SettingsPage() {
       <div className="border-t border-line pt-6">
         <SettingsForm initialName={user.name} initialBio={user.bio ?? ""} />
       </div>
+
+      {/*
+        Единственный вход в админку на весь сайт — тихая строка внизу «моих
+        штук», а не пункт в шапке. Два довода, оба проверены на этом проекте:
+
+        1. Шапка клиентская. Ветка `role === "admin"` вместе со строкой
+           "/admin" уехала бы в бандл ВСЕМ посетителям. Роут и так отдал бы
+           404 постороннему, но свойство «не палить существование закрытого
+           раздела» (ради которого в `requireAdmin()` выбран `notFound()`,
+           а не редирект) потерялось бы в devtools за десять секунд.
+        2. Ширина шапки — уже дважды пойманная боль, порог `lg` появился
+           именно из-за неё. Ещё один пункт туда не влезает.
+
+        Здесь же страница серверная: не-админу эта разметка не рендерится
+        вообще, в HTML её нет. Сравнение с `ADMIN_ROLE`, а не с голой
+        строкой, — та же константа-белый-список, что в гарде.
+      */}
+      {session.user.role === ADMIN_ROLE && (
+        <div className="border-t border-line pt-6">
+          <Link
+            href="/admin"
+            className="text-sm text-muted transition-colors hover:text-accent"
+          >
+            Администрирование
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

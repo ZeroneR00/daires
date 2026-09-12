@@ -1,26 +1,490 @@
 @import "tailwindcss";
 
+/*
+  Палитра «кофе»: три сорта, от самого крепкого к самому молочному. Базой стала
+  тёмная бумага вместо прежней кремовой — прежний «тёплый зин» был светлым
+  листом, теперь весь сайт читается как страница, залитая кофе.
+
+  Устройство при этом не изменилось ни на йоту, и в этом весь смысл затеи: цвета
+  живут здесь переменными, а не в разметке. Ни один компонент переписывать не
+  пришлось — они просят `bg-surface`, `text-ink`, `border-line`, а что за этими
+  именами стоит, решает только этот файл.
+
+  Сортов три, а блоков ниже — два. Средний, «кофе с молоком», лежит прямо в
+  `:root`: он же палитра по умолчанию, и отдельного блока-переопределения ему не
+  нужно. `data-theme="latte"` не совпадает ни с одним правилом — и это правильный
+  исход, а не забытая ветка.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /*
+    dark, а не прежнее `light dark`. Это свойство — единственный способ сказать
+    браузеру, каким тоном рисовать то, что рисует он сам: скроллбар, выпадающий
+    список, подсказку автозаполнения, чекбокс. Светлого сорта в меню нет ни
+    одного, поэтому значение общее для всех трёх и живёт только здесь.
+  */
+  color-scheme: dark;
+
+  --paper: #2a1e17; /* фон страницы: кофе, в котором размешана капля молока */
+  --surface: #34261d; /* карточка поверх бумаги — на глоток молока светлее */
+  --ink: #f2e6d6; /* основной текст: само молоко, тёплое, а не белое */
+  --muted: #b9a493; /* подписи, даты, счётчики */
+  --line: #47342a; /* рамки и разделители */
+  --accent: #e8895d; /* терракота, доведённая до карамели: на кофе прежняя глохла */
+  --accent-ink: #241610; /* текст на акцентной плашке */
+  --accent-wash: #3f2a1f; /* лёгкая заливка акцентом */
+  --rule: rgba(242, 230, 214, 0.055); /* линовка страницы-тетради на фоне */
+  --rule-margin: rgba(232, 137, 93, 0.2); /* вертикальное поле тетради, слева от колонки */
+  --danger: #f2a293; /* ошибки форм: светлее и краснее акцента, чтобы не путать с ним */
+
+  /*
+    Стена обложек на первом экране. Умножение отсюда убрано намеренно: оно
+    работало ровно потому, что снизу лежала СВЕТЛАЯ бумага — умножение оставляет
+    тёмное тёмным, а светлое отпускает в фон. На кофе тот же приём утопил бы всю
+    стену в чёрный. Берём обычное смешивание с прозрачностью плюс лёгкую сепию,
+    чтобы обложки ушли в тон напитка, а не висели цветными марками поверх него.
+
+    `--hero-blend` сортами не переопределяется — все три тёмные, умножение не
+    подходит ни одному. Переменная оставлена, чтобы разметка не знала об этом.
+  */
+  --hero-blend: normal;
+  --hero-tile: 0.5;
+  --hero-tone: sepia(0.2) saturate(1.15);
+
+  /* Псевдонимы боилерплейта — их ещё используют старые компоненты */
+  --background: var(--paper);
+  --foreground: var(--ink);
+}
+
+/*
+  Сорт первый, «Кофе»: без молока вовсе, самый крепкий и самый тёмный.
+
+  Медиа-запроса `prefers-color-scheme` в файле больше нет. Он был нужен, пока
+  существовало состояние «как в системе», и заставлял держать тёмную палитру
+  дважды — в запросе и в явном выборе, потому что CSS-переменную нельзя «взять
+  из другого селектора». Сортов теперь три, все выбираются руками, дубль ушёл.
+*/
+:root[data-theme="coffee"] {
+  --paper: #17110d;
+  --surface: #201810;
+  --ink: #ede1d1;
+  --muted: #a99483;
+  --line: #33261e;
+  --accent: #e8895d;
+  --accent-ink: #1b1009;
+  --accent-wash: #2f1f15;
+  --rule: rgba(237, 225, 209, 0.05);
+  --rule-margin: rgba(232, 137, 93, 0.18);
+  --danger: #f2a293;
+
+  /* Фон почти чёрный — обложкам не нужен ни тон, ни поблажка по прозрачности */
+  --hero-tile: 0.42;
+  --hero-tone: none;
+}
+
+/*
+  Сорт третий, «Мокачино»: молока больше всех, бумага заметно светлее.
+
+  Акцент здесь свой и светлее общего: на выцветшей бумаге прежняя карамель
+  теряла контраст со своей же подложкой (падала ниже 4.5:1 на карточке). Тот же
+  довод, по которому светлая тема раньше держала терракоту темнее тёмной — цвет
+  акцента задаёт не мода, а фон, на котором он лежит.
+*/
+:root[data-theme="mocha"] {
+  --paper: #3d2c22;
+  --surface: #4a3629;
+  --ink: #f7ecdf;
+  --muted: #c7b3a1;
+  --line: #5e4737;
+  --accent: #f0996b;
+  --accent-ink: #2a1810;
+  --accent-wash: #56392a;
+  --rule: rgba(247, 236, 223, 0.06);
+  --rule-margin: rgba(240, 153, 107, 0.22);
+  --danger: #f7b0a2;
+
+  /* Бумага светлее — обложки можно отпустить погромче, не перебивая заголовок */
+  --hero-tile: 0.58;
+  --hero-tone: sepia(0.24) saturate(1.15);
 }
 
 @theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
+  --color-danger: var(--danger);
+  --color-rule-margin: var(--rule-margin);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-literata), Georgia, "Times New Roman", serif;
+
+  --radius-card: 0.875rem;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+/* Текст дневника набирается антиквой — он тут главный, а не интерфейс */
+.prose-diary {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  letter-spacing: 0.003em;
+}
+
+::selection {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+/*
+  Винил: четыре слоя градиента вместо картинки — дырка, этикетка акцентом,
+  бороздки повторяющимся радиальным градиентом и само тело пластинки с бликом
+  слева сверху. Никаких ассетов, тема меняет цвет этикетки сама.
+*/
+.vinyl {
+  background:
+    radial-gradient(circle at 50% 50%, var(--paper) 0 3.5%, transparent 4%),
+    radial-gradient(circle at 50% 50%, var(--accent) 0 12%, transparent 12.5%),
+    repeating-radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 255, 255, 0.055) 0 1px,
+      rgba(255, 255, 255, 0) 1px 4px
+    ),
+    radial-gradient(circle at 32% 26%, #3b3431 0%, #16120f 62%, #0a0807 100%);
+  box-shadow: 0 14px 30px -16px rgba(0, 0, 0, 0.8);
+}
+
+.vinyl--spinning {
+  animation: vinyl-spin 3.2s linear infinite;
+}
+
+@keyframes vinyl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/*
+  Полоса проигранного под строкой трека. Ширину ведёт transform, а не width:
+  scaleX не вызывает layout, а `timeupdate` стреляет ~4 раза в секунду.
+  Саму переменную --p пишет в узел сам компонент, минуя React (см. TrackRow),
+  transition сглаживает эти редкие скачки до ровного хода.
+
+  В prefers-reduced-motion общее правило глушит длительность до 0.01ms, и
+  полоса пойдёт ступеньками по четверти секунды — правильный исход:
+  анимации нет, прогресс остался видимым.
+*/
+.track-progress {
+  transform: scaleX(var(--p, 0));
+  transform-origin: left;
+  transition: transform 0.25s linear;
+}
+
+/*
+  Зерно поверх всей страницы: бумага перестаёт выглядеть залитой краской.
+  Шум — процедурный SVG-фильтр в data-URI, файла картинки нет.
+*/
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Уважение к системной настройке: у кого укачивает — тому без вращения и выездов */
+@media (prefers-reduced-motion: reduce) {
+  .vinyl--spinning {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+  Цветное свечение карточки — размытая копия обложки её же трека. Картинка
+  приезжает переменной --glow из разметки, поэтому CSS остаётся статичным.
+
+  isolation: isolate + z-index: -1 у ::before — приём, который кладёт свечение
+  НАД фоном карточки, но ПОД её содержимым. Без isolate псевдоэлемент уехал бы
+  под саму карточку и пропал, а без z-index: -1 — лёг бы поверх текста.
+*/
+.glow-card {
+  isolation: isolate;
+}
+
+.glow-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -12%;
+  top: -30%;
+  width: 52%;
+  aspect-ratio: 1;
+  background-image: var(--glow);
+  background-size: cover;
+  background-position: center;
+  filter: blur(56px) saturate(1.8);
+  opacity: 0.33;
+  pointer-events: none;
+  /*
+    Затухание по кругу, а не только вправо: цвет живёт у обложки и растворяется
+    во все стороны. Горизонтальной маски хватало на мелкой карточке ленты, но на
+    крупной карточке записи низ и правый край блока оставались прямой границей —
+    свечение читалось серым прямоугольником, а не светом.
+  */
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 15%, transparent 100%);
+  mask-image: radial-gradient(circle closest-side, #000 15%, transparent 100%);
+}
+
+/*
+  Стена обложек на первом экране: колонки едут в разные стороны и растворяются
+  к центру, где лежит заголовок. Список обложек в разметке продублирован трижды,
+  поэтому сдвиг на треть высоты замыкается без видимого шва.
+*/
+.hero-wall {
+  /*
+    Своя бумага под стеной — не для вида, а ради умножения: смешивать элемент
+    не с чем, если под ним внутри изолированного контекста ничего не нарисовано,
+    и mix-blend-mode на обложках просто ничего бы не сделал.
+  */
+  background: var(--paper);
+  isolation: isolate;
+
+  /*
+    Две маски вместо одной. Радиальная выедает середину под заголовок,
+    линейная гасит низ: без неё нижний ряд обложек обрезался краем секции
+    ровной линией, и стена читалась приклеенной полосой, а не фоном.
+    Композит intersect берёт минимум прозрачности из обеих.
+  */
+  -webkit-mask-image:
+    radial-gradient(115% 85% at 50% 45%, transparent 36%, #000 82%),
+    linear-gradient(#000 62%, transparent 100%);
+  mask-image:
+    radial-gradient(115% 85% at 50% 45%, transparent 36%, #000 82%),
+    linear-gradient(#000 62%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.hero-wall img {
+  mix-blend-mode: var(--hero-blend);
+  opacity: var(--hero-tile);
+  filter: var(--hero-tone);
+}
+
+.marquee-col {
+  animation-name: marquee-up;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.marquee-col--down {
+  animation-name: marquee-down;
+}
+
+@keyframes marquee-up {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-33.333%);
+  }
+}
+
+@keyframes marquee-down {
+  from {
+    transform: translateY(-33.333%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-col {
+    animation: none;
+  }
+}
+
+/*
+  Линовка: страница лежит на тетрадном листе. Это дневник, и линейка в поле
+  зрения — самая честная метафора, какая тут может быть. Рисуется повторяющимся
+  градиентом, ассета нет; карточки (`bg-surface`) непрозрачны и накрывают её,
+  так что линовка видна только в полях и промежутках.
+
+  Маска сверху: под шапкой линовка проявляется не сразу, иначе первый экран
+  выглядит расчерченным бланком, а не бумагой.
+*/
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 31px,
+    var(--rule) 31px 32px
+  );
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
+}
+
+/*
+  Вертикальное поле тетради — та самая линия, за которую в тетради не заходят.
+  Живёт на `html::before`, а не вторым слоем в `body::before`: у линовки уже
+  есть своя геометрия, и подмешивать туда ещё один градиент значило бы
+  переписывать оба разом ради любой правки одного.
+
+  Линия привязана не к краю экрана, а к колонке содержимого
+  (`max-w-5xl` = 64rem, её левый край — `50% - 32rem`) и лежит на 2rem левее.
+  Поэтому она включается только с 72rem: на узком экране поля нет вовсе,
+  и линия прошла бы прямо по тексту, а не рядом с ним. Маска сверху — та же,
+  что у линовки: первый экран не должен выглядеть разлинованным бланком.
+*/
+@media (min-width: 72rem) {
+  html::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: calc(50% - 34rem);
+    width: 1px;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--rule-margin);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 14rem);
+  }
+}
+
+/*
+  Подпись сайта — «Линия»: ровная нить, всплеск, снова ровная нить. Тишина,
+  песня, тишина; ровно то, чем является одна запись дневника. Один и тот же
+  знак работает и логотипом в шапке, и разделителем между блоками, и — при
+  желании — иконкой приложения: это просто штрих, ему всё равно, где лежать.
+
+  dasharray с нулевым offset в базовом состоянии, а не наоборот: линия по
+  умолчанию нарисована целиком, и любая другая анимация может подменить эту,
+  не заставив штрих исчезнуть (offset вернулся бы к своему базовому значению).
+*/
+.waveline__burst {
+  stroke-dasharray: var(--stroke-len, 110);
+  stroke-dashoffset: 0;
+  animation: waveline-draw 1.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@keyframes waveline-draw {
+  from {
+    stroke-dashoffset: var(--stroke-len, 110);
+  }
+}
+
+/*
+  Пока в вкладке играет превью — всплеск дышит. transform-box: fill-box меняет
+  систему координат трансформации на собственный bbox пути, иначе центром
+  масштабирования стал бы угол всего SVG и всплеск уехал бы вбок.
+*/
+.waveline--live .waveline__burst {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: waveline-pulse 1.05s ease-in-out infinite;
+}
+
+@keyframes waveline-pulse {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  35% {
+    transform: scaleY(1.28);
+  }
+  70% {
+    transform: scaleY(0.78);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waveline__burst,
+  .waveline--live .waveline__burst {
+    animation: none;
+  }
+}
+
+/*
+  Состояние «загружается»: штрих прописывается слева и уходит за правый край,
+  по кругу. Устройство — тот же приём, что и в разовой прорисовке, только
+  offset едет дальше нуля, в минус.
+
+  Почему это работает: при dasharray = L штрих и пробел равны длине пути.
+  offset = L прячет штрих целиком (в нуле пути стоит пробел), offset = 0
+  показывает целиком, offset = -L прячет опять — но уже «выехав» вправо.
+  Один прогон L → -L и есть полный цикл «написалось / стёрлось с хвоста».
+*/
+.waveline--writing .waveline__burst {
+  /* linear, а не ease: плавная кривая тормозит у краёв цикла, а края здесь —
+     это как раз мгновения, когда штрих спрятан целиком. */
+  animation: waveline-write 2s linear infinite;
+}
+
+/*
+  Не сворачивать в calc(var(--stroke-len) * -1): calc() с var() внутри
+  @keyframes не интерполируется, анимация станет дискретной — знак пойдёт
+  ступенями. Вторая переменная приезжает готовым числом; подробности — в
+  комментарии Waveline.tsx, который её и считает.
+*/
+@keyframes waveline-write {
+  from {
+    stroke-dashoffset: var(--stroke-len, 110);
+  }
+  to {
+    stroke-dashoffset: var(--stroke-len-neg, -110);
+  }
+}
+
+/*
+  Отложенное появление для экранов-состояний. Локально страницы отвечают за
+  ~80 мс, и лоадер без задержки мигает вспышкой — читается как глитч, а не
+  как загрузка. Быстрый переход не должен показывать его вовсе.
+*/
+.appear-delayed {
+  opacity: 0;
+  animation: appear-fade 0.45s ease 0.3s forwards;
+}
+
+@keyframes appear-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waveline--writing .waveline__burst {
+    animation: none;
+  }
+  /*
+    Здесь animation: none обязано идти в паре с opacity: 1 — иначе выключенная
+    анимация оставит базовый opacity: 0 и экран загрузки станет пустым.
+  */
+  .appear-delayed {
+    animation: none;
+    opacity: 1;
+  }
 }

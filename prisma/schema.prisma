@@ -13,23 +13,49 @@ datasource db {
 }
 
 model User {
-  id            String    @id
-  name          String
-  email         String
-  emailVerified Boolean   @default(false)
-  image         String?
-  username      String    @unique
-  bio           String?
-  avatarUrl     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  posts         Post[]
-  comments      Comment[]
-  likes         Like[]
-  following     Follow[]  @relation("Follower")
-  followers     Follow[]  @relation("Following")
+  id                     String          @id
+  name                   String
+  email                  String
+  emailVerified          Boolean         @default(false)
+  image                  String?
+  username               String          @unique
+  bio                    String?
+  avatarUrl              String?
+  // Роль: "user" или "admin". NOT NULL с дефолтом, а не String?: у колонки
+  // всегда есть значение, и ни один путь в коде не может записать сюда NULL.
+  // В Postgres 11+ ADD COLUMN NOT NULL DEFAULT таблицу не переписывает, так
+  // что миграция дешёвая даже на живой базе.
+  //
+  // Проверено 2026-09-09: в TypeScript через Better Auth роль всё равно
+  // приезжает как `string | null | undefined` (поле объявлено там
+  // `required: false`), несмотря на NOT NULL в базе. Гарду это не мешает —
+  // он сравнивает `=== "admin"`, а не разыменовывает; каст `as` не нужен.
+  //
+  // Индекса по role нет намеренно: кардинальность 2, админ в базе один —
+  // планировщик всё равно возьмёт seq scan. Не добавлять «для симметрии».
+  //
+  // И не enum: добавление роли «модератор» тогда стало бы DDL-миграцией
+  // вместо одной строки в коде.
+  role                   String          @default("user")
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  sessions               Session[]
+  accounts               Account[]
+  posts                  Post[]
+  comments               Comment[]
+  likes                  Like[]
+  following              Follow[]        @relation("Follower")
+  followers              Follow[]        @relation("Following")
+  sentFriendRequests     FriendRequest[] @relation("SentFriendRequests")
+  receivedFriendRequests FriendRequest[] @relation("ReceivedFriendRequests")
+  friendshipsA           Friendship[]    @relation("FriendshipA")
+  friendshipsB           Friendship[]    @relation("FriendshipB")
+  conversationsA         Conversation[]  @relation("ConversationA")
+  conversationsB         Conversation[]  @relation("ConversationB")
+  sentMessages           Message[]
+  // Жалобы, поданные ЭТИМ пользователем. Обратной связи «жалобы на меня» нет:
+  // жалуются на запись или комментарий, а не на человека.
+  reports                Report[]        @relation("Reporter")
 
   @@unique([email])
   @@map("user")
@@ -109,6 +135,7 @@ model Post {
   comments  Comment[]
   likes     Like[]
   tracks    PostTrack[]
+  reports   Report[]
 
   @@unique([authorId, slug])
   @@map("post")
@@ -136,6 +163,7 @@ model Comment {
   author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   text      String
   createdAt DateTime @default(now())
+  reports   Report[]
 
   @@map("comment")
 }
@@ -162,4 +190,121 @@ model Follow {
 
   @@unique([followerId, followingId])
   @@map("follow")
+}
+
+model FriendRequest {
+  id         String    @id @default(cuid())
+  senderId   String
+  sender     User      @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User      @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  // Получатель нажал "Позже": заявка жива, но не считается в шапке и не
+  // поднимает тост. Дата, а не boolean — оставляет возможность авто-возврата.
+  ignoredAt  DateTime?
+
+  @@unique([senderId, receiverId])
+  @@map("friend_request")
+}
+
+model Friendship {
+  id        String   @id @default(cuid())
+  userAId   String
+  userA     User     @relation("FriendshipA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId   String
+  userB     User     @relation("FriendshipB", fields: [userBId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userAId, userBId])
+  @@map("friendship")
+}
+
+model Conversation {
+  id              String    @id @default(cuid())
+  userAId         String
+  userA           User      @relation("ConversationA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId         String
+  userB           User      @relation("ConversationB", fields: [userBId], references: [id], onDelete: Cascade)
+  // Денормализация ради сортировки списка: иначе "свежие сверху" требует
+  // подзапроса за последним сообщением каждого диалога.
+  lastMessageAt   DateTime  @default(now())
+  // "Прочитано" — метка на диалоге, а не флаг на каждом сообщении: открытие
+  // чата с 200 сообщениями это один update, а не 200. null — ни разу не открывал.
+  userALastReadAt DateTime?
+  userBLastReadAt DateTime?
+  createdAt       DateTime  @default(now())
+  messages        Message[]
+
+  @@unique([userAId, userBId])
+  @@index([userAId, lastMessageAt])
+  @@index([userBId, lastMessageAt])
+  @@map("conversation")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  text           String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("message")
+}
+
+/*
+  Жалоба на запись или на комментарий.
+
+  Одна модель на оба случая, два nullable FK вместо полиморфной пары
+  targetType/targetId: у пары нет внешнего ключа, и жалоба пережила бы
+  удаление цели, превратившись в строку с мёртвым id. Две отдельные модели
+  (ReportOnPost / ReportOnComment) дали бы то же самое ценой удвоенного
+  списка, двух запросов и ручной слитной сортировки в разделе админки.
+
+  Инвариант «ровно одно из двух заполнено» держит CHECK-констрейнт,
+  дописанный руками в миграции (Prisma объявлять CHECK не умеет):
+    CHECK (num_nonnulls("postId", "commentId") = 1)
+  Прецедент ручной миграции в проекте есть — add_fulltext_search_indexes.
+  Цена та же: schema.prisma перестаёт быть полным описанием базы, про этот
+  констрейнт знает только папка миграций.
+
+  Дедуп работает на NULL-семантике Postgres, и это выглядит случайностью,
+  хотя нужно намеренно: в уникальном индексе два NULL считаются РАЗНЫМИ
+  значениями, поэтому уник [reporterId, postId] при postId IS NULL (жалоба
+  на комментарий) не ограничивает ничего. Так два уника уживаются в одной
+  таблице и каждый стережёт свою половину.
+
+  Уник вечен: после dismissed повторно пожаловаться на тот же объект нельзя.
+  Осознанно — dismissed означает «посмотрел, нормально», — но объект с тех
+  пор мог измениться; если это начнёт мешать, лечится удалением закрытых
+  жалоб, а не снятием уника.
+
+  Каскад делает resolved редким статусом: основной путь модерации — удалить
+  объект, и жалоба уходит вместе с ним. resolved остаётся для «жалоба
+  справедлива, но удалять не буду». SetNull ради истории сломал бы инвариант
+  «ровно одно из двух»: жалоба осталась бы с двумя NULL.
+*/
+model Report {
+  id         String    @id @default(cuid())
+  reporterId String
+  reporter   User      @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  postId     String?
+  post       Post?     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId  String?
+  comment    Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reason     String
+  // open | resolved | dismissed. Строка, а не enum — по тому же доводу, что
+  // у User.role: новый статус не должен быть DDL-миграцией.
+  status     String    @default("open")
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  @@unique([reporterId, postId])
+  @@unique([reporterId, commentId])
+  // Разбор всегда идёт по «открытым, свежие сверху» — индекс ровно под этот
+  // запрос, парой: сначала фильтр, потом сортировка.
+  @@index([status, createdAt])
+  @@map("report")
 }

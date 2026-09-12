@@ -553,3 +553,81 @@ export async function getAdminReportsPage(params: {
 export async function getOpenReportCount(): Promise<number> {
   return prisma.report.count({ where: { status: REPORT_STATUS.open } });
 }
+
+/*
+  ─── Треки ─────────────────────────────────────────────────────────────────
+
+  Раздел показывает не все треки, а только осиротевшие — те, что не
+  прикреплены ни к одной записи. Список всех треков модератору не нужен:
+  живой трек виден в своей записи, и делать с ним по отдельности нечего.
+
+  Откуда сироты берутся: `Track` — это кэш метаданных по `externalId`, общий
+  на весь сайт (правило «перед созданием Track всегда upsert по externalId»).
+  Удаление записи каскадит только связь `PostTrack`, сам трек остаётся. Значит
+  сирота — не битая строка, а ОСТЫВШИЙ КЭШ: её удаление стоит ровно одного
+  лишнего похода в iTunes, когда трек понадобится снова.
+
+  Поэтому раздел — гигиена, а не обязанность, и звучать должен так же
+  («N треков ни в одной записи»), без призыва чистить.
+*/
+
+/**
+ * Условие «сирота» — одно на чтение и на удаление.
+ *
+ * Вынесено в константу намеренно: список и `deleteMany` в экшене обязаны
+ * фильтровать ОДИНАКОВО, иначе кнопка снесёт не то, что было показано.
+ * `Track.posts` — это `PostTrack[]`, поэтому пустота пишется через `none`.
+ */
+export const orphanTrackWhere = {
+  posts: { none: {} },
+} satisfies Prisma.TrackWhereInput;
+
+/*
+  Поиска по этому списку нет намеренно — в отличие от записей, комментариев
+  и пользователей. Там модератор ищет конкретный объект по жалобе; здесь
+  искать нечего: строки безымянны для модерации, их разбирают оптом.
+*/
+const adminTrackRow = {
+  id: true,
+  externalId: true,
+  source: true,
+  title: true,
+  artist: true,
+  album: true,
+  createdAt: true,
+} satisfies Prisma.TrackSelect;
+
+export type AdminTrackRow = Prisma.TrackGetPayload<{
+  select: typeof adminTrackRow;
+}>;
+
+/**
+ * Страница осиротевших треков плюс общее число треков — для строки
+ * «ни в одной записи: N из M». Без знаменателя число сирот ничего не говорит:
+ * 40 из 45 и 40 из 4000 — это разные новости.
+ */
+export async function getAdminOrphanTracksPage(params: {
+  page: number;
+}): Promise<AdminPage<AdminTrackRow> & { trackTotal: number }> {
+  const [rows, total, trackTotal] = await Promise.all([
+    prisma.track.findMany({
+      where: orphanTrackWhere,
+      // Пара `createdAt` + `id`, как во всех списках админки: одного
+      // `createdAt` мало, порядок внутри миллисекунды иначе не определён.
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (params.page - 1) * ADMIN_PAGE_SIZE,
+      take: ADMIN_PAGE_SIZE,
+      select: adminTrackRow,
+    }),
+    prisma.track.count({ where: orphanTrackWhere }),
+    prisma.track.count(),
+  ]);
+
+  return {
+    rows,
+    total,
+    page: params.page,
+    pageCount: pageCountOf(total),
+    trackTotal,
+  };
+}

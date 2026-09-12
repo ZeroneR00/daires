@@ -35,7 +35,8 @@ export default async function AdminOverviewPage() {
 
   /*
     `href` есть только у тех плиток, чей раздел уже существует: мёртвая ссылка
-    хуже её отсутствия. Пользователи и треки получат его на своих этапах.
+    хуже её отсутствия. Без ссылки остались «Новых за неделю» и «Лайков» —
+    у них своего раздела нет и не планируется.
   */
   const tiles: {
     label: string;
@@ -48,7 +49,7 @@ export default async function AdminOverviewPage() {
     { label: "Записей", value: overview.postCount, note: `за неделю: ${overview.newPostCount}`, href: "/admin/posts" },
     { label: "Комментариев", value: overview.commentCount, href: "/admin/comments" },
     { label: "Лайков", value: overview.likeCount },
-    { label: "Треков", value: overview.trackCount, note: `ни в одной записи: ${overview.orphanTrackCount}` },
+    { label: "Треков", value: overview.trackCount, note: `ни в одной записи: ${overview.orphanTrackCount}`, href: "/admin/tracks" },
     // Единственная плитка, которая зовёт к действию, а не описывает состояние,
     // поэтому подпись говорит про очередь («ждут разбора»), а не про всего.
     { label: "Жалоб", value: overview.openReportCount, note: "ждут разбора", href: "/admin/reports" },

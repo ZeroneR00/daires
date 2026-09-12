@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ADMIN_ROLE, USER_ROLE, getAdminSession } from "@/lib/admin";
+import { orphanTrackWhere } from "@/lib/admin-queries";
 import { REPORT_STATUS, isReportStatus } from "@/lib/report-schema";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
@@ -248,5 +249,50 @@ export async function resolveReport(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/admin/reports");
+  revalidatePath("/admin");
+}
+
+/**
+ * Удаление всех осиротевших треков — одним `deleteMany`, а не строка за
+ * строкой.
+ *
+ * Поштучной кнопки в списке нет намеренно: удалить одну строку остывшего кэша
+ * — действие без смысла, а тридцать тихих «Удалить» в столбик превратили бы
+ * гигиену в работу. Здесь ровно одно действие, поэтому оно и залитое.
+ *
+ * Условие берём то же самое (`orphanTrackWhere`), что и список: Postgres
+ * перечитает его в момент DELETE, так что трек, успевший попасть в запись
+ * между показом страницы и нажатием, под удаление уже не попадёт.
+ */
+export async function deleteOrphanTracks(): Promise<void> {
+  const session = await getAdminSession();
+  if (!session) return;
+
+  try {
+    await prisma.track.deleteMany({ where: orphanTrackWhere });
+  } catch (error) {
+    /*
+      P2003 — нарушение внешнего ключа. Здесь это может значить ровно одно:
+      прямо между выборкой строк и их удалением кто-то прикрепил трек к новой
+      записи, и `Restrict` на `PostTrack.trackId` не дал снести живую связь.
+      То есть ограничение схемы сработало как страховка, а не как поломка.
+
+      Код читаем утиной типизацией — тот же приём, что с `P2002` в
+      `createReport`: класс ошибки пришлось бы тянуть из `generated/`.
+
+      Наружу ошибку не отдаём (форма zero-JS, места под ответ нет) — но и
+      страницу не роняем: после ревалидации модератор увидит те же строки
+      на месте и просто нажмёт ещё раз. Это общее правило экшенов админки,
+      записанное в шапке файла.
+    */
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code !== "P2003") throw error;
+  }
+
+  revalidatePath("/admin/tracks");
   revalidatePath("/admin");
 }

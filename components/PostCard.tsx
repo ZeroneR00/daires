@@ -121,32 +121,67 @@ export function PostCard({
           </Link>
         </div>
 
-        <div className={`flex gap-4 ${post.text ? "" : "items-center"}`}>
+        {/*
+          Ниже lg текст обтекает обложку, как в журнале, и под ней уходит на
+          всю ширину. Колонкой рядом с обложкой на телефоне оставалось ~130 px
+          — две-три слова в строке. Обтекание — это float, а не flex: flex
+          ставит блоки рядом, но переносить строки под соседа не умеет.
+
+          Один набор классов на оба режима: внутри flex-контейнера (lg и шире)
+          float браузер игнорирует сам, так что обложке достаточно float-left
+          и снятых на lg отступов. flow-root держит float внутри блока — без
+          него список дорожек ниже подтягивался бы вверх, под короткий текст.
+
+          Запись без текста не обтекается: она центрируется по обложке, и
+          подпись трека рядом — её единственное содержимое, а не дубль.
+        */}
+        <div
+          className={
+            // mb-2: подпись-дубль ниже lg ушла, и конец текста отделяется от
+            // списка дорожек воздухом, а не новым элементом
+            post.text
+              ? "mb-2 flow-root lg:mb-0 lg:flex lg:gap-4"
+              : "flex items-center gap-4"
+          }
+        >
           {hero && heroArtwork && (
-            <TrackArtwork
-              trackId={hero.id}
-              artworkUrl={heroArtwork}
-              previewUrl={hero.previewUrl}
-              title={hero.title}
-              artist={hero.artist}
-              href={postHref}
-              size={128}
-              queue={queue}
-            />
+            <div className={post.text ? "float-left mr-4 mb-2 lg:m-0" : "contents"}>
+              <TrackArtwork
+                trackId={hero.id}
+                artworkUrl={heroArtwork}
+                previewUrl={hero.previewUrl}
+                title={hero.title}
+                artist={hero.artist}
+                href={postHref}
+                size={128}
+                queue={queue}
+                vinylFrom={post.text ? "lg" : "base"}
+              />
+            </div>
           )}
 
-          {/* relative z-10: пластинка выезжает вправо абсолютом и иначе легла бы поверх текста */}
-          <div className="relative z-10 min-w-0 flex-1">
+          {/*
+            lg:relative lg:z-10 — пластинка выезжает вправо абсолютом и иначе
+            легла бы поверх текста. Ниже lg слоя быть не должно: при обтекании
+            этот прозрачный блок лежит на всю ширину, в том числе под обложкой,
+            и с z-10 перекрыл бы её — обложка перестала бы нажиматься. Пластинка
+            там не выезжает, так что закрываться не от чего.
+          */}
+          <div className="min-w-0 flex-1 lg:relative lg:z-10">
             {post.text && (
               <p className="prose-diary whitespace-pre-wrap text-ink">
                 {excerpt(post.text)}
               </p>
             )}
 
+            {/* Под обтекающим текстом подпись повторяла бы первую строку
+                списка дорожек, стоящего сразу за ней, — и текст казался бы
+                не кончившимся, а перетёкшим в треки. Поэтому ниже lg она есть
+                только у записи без текста. */}
             {hero && (
               <p
-                className={`flex min-w-0 items-center gap-2 text-sm text-muted ${
-                  post.text ? "mt-3" : ""
+                className={`min-w-0 items-center gap-2 text-sm text-muted ${
+                  post.text ? "mt-3 hidden lg:flex" : "flex"
                 }`}
               >
                 <span aria-hidden className="shrink-0 text-base leading-none text-accent">▸</span>

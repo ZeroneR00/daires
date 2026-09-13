@@ -19,6 +19,14 @@ interface TrackArtworkProps {
     превью.
   */
   queue?: QueueTrack[];
+  /*
+    С какой ширины пластинка выезжает из конверта. "lg" — ниже порога её нет
+    вовсе, и места под неё в потоке не резервируется: карточка ленты обтекает
+    обложку текстом, и пустые 34% справа съедали бы узкую колонку телефона.
+    Ховера на тач-экране всё равно нет, а игру там показывают кнопка паузы и
+    свечение. Страница записи ставит обложку над текстом — ей запас не мешает.
+  */
+  vinylFrom?: "base" | "lg";
 }
 
 /*
@@ -41,6 +49,7 @@ export function TrackArtwork({
   href,
   size = 112,
   queue,
+  vinylFrom = "base",
 }: TrackArtworkProps) {
   const { playingId, toggle, playQueue } = usePreviewPlayer();
   /*
@@ -71,10 +80,18 @@ export function TrackArtwork({
 
   return (
     /* Ширина с запасом справа: там лежит пластинка, и место под неё
-       зарезервировано в потоке — иначе на ховере она наезжала бы на текст. */
+       зарезервировано в потоке — иначе на ховере она наезжала бы на текст.
+       Размер уходит CSS-переменной, а не шириной в style: инлайн-стиль не
+       умеет брейкпоинты, а запас при vinylFrom="lg" обязан от них зависеть.
+       Классы выписаны целиком, не склейкой: Tailwind ищет их в исходнике
+       строками и собранное из кусков имя не увидит. */
     <div
-      className="group/art relative shrink-0"
-      style={{ width: Math.round(size * 1.34), height: size }}
+      className={`group/art relative shrink-0 ${
+        vinylFrom === "lg"
+          ? "w-(--art) lg:w-[calc(var(--art)*1.34)]"
+          : "w-[calc(var(--art)*1.34)]"
+      }`}
+      style={{ "--art": `${size}px`, height: size } as React.CSSProperties}
     >
       <span
         aria-hidden
@@ -85,8 +102,10 @@ export function TrackArtwork({
 
       <span
         aria-hidden
-        className={`absolute inset-y-0 left-0 z-0 aspect-square transition-transform duration-500 ease-out group-hover/art:translate-x-[34%] ${
-          isPlaying ? "translate-x-[34%]" : ""
+        className={`absolute inset-y-0 left-0 z-0 aspect-square transition-transform duration-500 ease-out ${
+          vinylFrom === "lg"
+            ? `lg:group-hover/art:translate-x-[34%] ${isPlaying ? "lg:translate-x-[34%]" : ""}`
+            : `group-hover/art:translate-x-[34%] ${isPlaying ? "translate-x-[34%]" : ""}`
         }`}
       >
         <span

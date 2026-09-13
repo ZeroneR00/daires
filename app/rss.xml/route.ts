@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const xml = renderFeed({
     posts,
     origin,
-    channelTitle: "music-diary",
+    channelTitle: "music·diary",
     channelDescription: "Лента музыкальных дневников",
     channelPath: "/",
     feedPath: "/rss.xml",

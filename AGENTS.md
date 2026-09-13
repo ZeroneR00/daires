@@ -70,6 +70,7 @@ npx prisma migrate dev --name <имя>   # новая миграция
 | `lib/auth-client.ts` | `authClient` для клиентских компонентов |
 | `app/api/auth/[...all]/route.ts` | catch-all route handler Better Auth |
 | `app/login/page.tsx`, `app/signup/page.tsx` | формы, зовут `authClient` напрямую — **сознательное исключение** из «мутации только через Server Actions»: это плюмбинг Better Auth, не бизнес-мутация |
+| `lib/demo.ts` + `app/login/actions.ts` | демо-вход «Войти как гость»: `resetDemoAccount` **сносит и сеет эталон заново** перед каждым входом гостя (cron нет — решение разработчика). Пароль восстанавливается при каждом сбросе: `change-password` у Better Auth публичный, **проверено 2026-09-13 — шутник запирал демо за один запрос**. Демо обязан оставаться без витринных записей |
 
 **Layout / навигация**
 | Файл | Что там |

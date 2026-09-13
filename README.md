@@ -8,7 +8,22 @@ sleeve.
 
 **Live:** https://daires.vercel.app · **Interface language:** Russian
 
-<!-- Screenshots go here once the production deploy is green. -->
+**Try it without signing up:** on [the sign-in page](https://daires.vercel.app/login)
+press **«Войти как гость»** (“Sign in as guest”). It is one shared demo account,
+reset to a clean state on every guest sign-in — post, like, reply to the message
+that is waiting for you.
+
+![The public feed on desktop](docs/screenshots/feed-desktop.jpg)
+
+<p>
+  <img src="docs/screenshots/entry.jpg" width="64%" alt="A single entry: the text, three tracks with previews, a comment">
+  <img src="docs/screenshots/feed-mobile.jpg" width="30%" alt="The same feed on a phone: the text wraps around the artwork">
+</p>
+
+![A direct message waiting in the demo account](docs/screenshots/messages.jpg)
+
+<sub>The feed · one entry with three tracks and a comment · the feed on a
+phone · a direct message in the demo account. Captured from production.</sub>
 
 ---
 

@@ -137,10 +137,10 @@ export function PostCard({
         */}
         <div
           className={
-            // mb-2: подпись-дубль ниже lg ушла, и конец текста отделяется от
-            // списка дорожек воздухом, а не новым элементом
+            // mb-2: подписи-дубля нет, и конец текста отделяется от списка
+            // дорожек воздухом, а не новым элементом
             post.text
-              ? "mb-2 flow-root lg:mb-0 lg:flex lg:gap-4"
+              ? "mb-2 flow-root lg:flex lg:gap-4"
               : "flex items-center gap-4"
           }
         >
@@ -174,16 +174,13 @@ export function PostCard({
               </p>
             )}
 
-            {/* Под обтекающим текстом подпись повторяла бы первую строку
-                списка дорожек, стоящего сразу за ней, — и текст казался бы
-                не кончившимся, а перетёкшим в треки. Поэтому ниже lg она есть
-                только у записи без текста. */}
-            {hero && (
-              <p
-                className={`min-w-0 items-center gap-2 text-sm text-muted ${
-                  post.text ? "mt-3 hidden lg:flex" : "flex"
-                }`}
-              >
+            {/* Подпись трека — только у записи без текста. У записи с текстом
+                она повторяла бы первую строку списка дорожек, стоящего сразу
+                за ней, и текст казался бы не кончившимся, а перетёкшим в
+                треки. Сначала её убрали только ниже lg, где это бросалось в
+                глаза сильнее; на широком экране дубль тот же. */}
+            {hero && !post.text && (
+              <p className="flex min-w-0 items-center gap-2 text-sm text-muted">
                 <span aria-hidden className="shrink-0 text-base leading-none text-accent">▸</span>
                 <span className="truncate">
                   <span className="font-medium text-ink">{hero.artist}</span>

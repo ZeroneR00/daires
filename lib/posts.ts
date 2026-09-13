@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -142,7 +143,19 @@ export function getPostsByUsername(username: string): Promise<PostWithDetails[]>
   });
 }
 
-export function getPostBySlug(
+/*
+  Единственная функция чтения в этом файле, обёрнутая в cache() — и
+  единственная, которую за один запрос зовут дважды: сначала
+  `generateMetadata` страницы записи (ему нужны заголовок, текст и обложка),
+  потом сама страница. cache() из React держит результат в пределах одного
+  рендера, поэтому второй вызов получает уже посчитанное, а в базу уходит
+  один запрос вместо двух.
+
+  Остальным функциям здесь это не нужно: их зовут по одному разу за рендер,
+  и обёртка добавила бы только шум. Заворачивать «на всякий случай» нечего —
+  cache() не кэш между запросами, память живёт ровно один рендер.
+*/
+export const getPostBySlug = cache(function getPostBySlug(
   username: string,
   slug: string,
 ): Promise<PostWithDetails | null> {
@@ -150,7 +163,7 @@ export function getPostBySlug(
     ...postWithDetails,
     where: { slug, author: { username } },
   });
-}
+});
 
 export function getPostById(id: string): Promise<PostWithDetails | null> {
   return prisma.post.findUnique({
@@ -223,5 +236,36 @@ export function getCommentsForPost(postId: string): Promise<CommentWithAuthor[]>
     ...commentWithAuthor,
     where: { postId },
     orderBy: { createdAt: "asc" },
+  });
+}
+
+/*
+  Чтение для карты сайта. Живёт здесь, а не в app/sitemap.ts, по общему
+  правилу файла: всё чтение постов и профилей — в одном слое.
+
+  `select` вместо общего `postWithDetails`: карте нужны четыре поля, а
+  общий include тащит автора, треки и счётчики — на весь сайт разом это
+  заметная разница, и ни одно из этих полей в XML не попадёт.
+
+  Потолок в 5000 адресов — не про наши объёмы, а про формат: в одном файле
+  карты их разрешено не больше 50 000. Упрёмся — придётся резать карту на
+  несколько через generateSitemaps, и пусть лучше в этот момент отвалится
+  хвост, чем сломается весь файл.
+*/
+export function getSitemapPosts(): Promise<
+  { slug: string; updatedAt: Date; author: { username: string } }[]
+> {
+  return prisma.post.findMany({
+    select: { slug: true, updatedAt: true, author: { select: { username: true } } },
+    orderBy: { updatedAt: "desc" },
+    take: 5000,
+  });
+}
+
+export function getSitemapUsers(): Promise<{ username: string }[]> {
+  return prisma.user.findMany({
+    select: { username: true },
+    orderBy: { username: "asc" },
+    take: 5000,
   });
 }

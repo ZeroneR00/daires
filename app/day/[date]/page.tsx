@@ -39,7 +39,8 @@ export async function generateMetadata({
 
   const { u } = await searchParams;
   const label = formatPostDate(range.start);
-  return { title: u ? `${label} · @${u} — music-diary` : `${label} — music-diary` };
+  // Хвост «— music·diary» дописывает шаблон в корневом layout.
+  return { title: u ? `${label} · @${u}` : label };
 }
 
 export default async function DayPage({ params, searchParams }: DayPageProps) {

@@ -1,4 +1,4 @@
-# Daires — a music diary
+# music·diary
 
 A blogging platform where every entry is a personal note plus the track that
 belongs to it. You write what you want to remember; the track metadata (title,

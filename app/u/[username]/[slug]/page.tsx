@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { deriveTitle } from "@/lib/rss";
+import { SITE_LOCALE, SITE_NAME } from "@/lib/site";
 import { formatPostDate, toDayKey } from "@/lib/format-date";
 import { artworkAtSize } from "@/lib/artwork";
 import { getPostBySlug, getCommentsForPost, getLikedPostIds } from "@/lib/posts";
@@ -20,6 +23,57 @@ export const dynamic = "force-dynamic";
 
 interface PostPageProps {
   params: Promise<{ username: string; slug: string }>;
+}
+
+/*
+  Самая расшариваемая страница сайта: ссылку кидают на запись, а не на ленту.
+  До этого своих метаданных у неё не было вообще — в мессенджере показывался
+  общий заголовок сайта, одинаковый для всех записей.
+
+  Заголовок считает `deriveTitle` из lib/rss.ts — та же функция, что даёт
+  заголовок этой записи в RSS. Своей копии правила «первая непустая строка,
+  а если текста нет — артист и название» здесь заводить нечего: разъедутся.
+
+  Второго похода в базу это не стоит: `getPostBySlug` обёрнут в cache(),
+  так что страница ниже получит уже посчитанный результат.
+*/
+export async function generateMetadata({ params }: PostPageProps): Promise<Metadata> {
+  const { username, slug } = await params;
+  const post = await getPostBySlug(username, slug);
+  // Записи нет — метаданные не наши, страница всё равно уйдёт в notFound().
+  if (!post) return {};
+
+  const title = deriveTitle(post);
+  const artwork = artworkAtSize(post.tracks[0]?.track.artworkUrl ?? null, 600);
+  // Текст записи в одну строку: в карточке ссылки переносы всё равно
+  // схлопнутся, а необрезанный текст мессенджер обрежет сам и как попало.
+  const excerpt = post.text.replace(/\s+/g, " ").trim();
+  const description =
+    excerpt.length > 200 ? `${excerpt.slice(0, 199).trimEnd()}…` : excerpt;
+
+  return {
+    title,
+    // У записи без текста описанием служит её же состав — не пустая строка.
+    description:
+      description ||
+      post.tracks.map((t) => `${t.track.artist} — ${t.track.title}`).join(" · "),
+    openGraph: {
+      type: "article",
+      title,
+      // Повторяются намеренно: свой openGraph замещает родительский целиком,
+      // а не дополняет его. Подробности — в lib/site.ts.
+      siteName: SITE_NAME,
+      locale: SITE_LOCALE,
+      publishedTime: post.createdAt.toISOString(),
+      authors: [post.author.name],
+      // Обложка приходит абсолютным адресом от внешнего API, так что
+      // metadataBase к ней не применяется — и не должен.
+      ...(artwork ? { images: [{ url: artwork, width: 600, height: 600 }] } : {}),
+    },
+    // Квадратная обложка в широкой карточке обрезается по бокам — для этой
+    // страницы карточка должна быть мелкой, с картинкой сбоку.
+    twitter: { card: artwork ? "summary" : "summary_large_image" },
+  };
 }
 
 export default async function PostPage({ params }: PostPageProps) {

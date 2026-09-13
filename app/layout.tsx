@@ -5,6 +5,7 @@ import { FriendRequestToast } from "@/components/FriendRequestToast";
 import { NotificationsProvider } from "@/components/NotificationsProvider";
 import { PreviewPlayerProvider } from "@/components/PreviewPlayer";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { SITE_LOCALE, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 // subsets обязаны включать cyrillic: без него next/font не кладёт
@@ -22,11 +23,43 @@ const literata = Literata({
 });
 
 export const metadata: Metadata = {
-  title: "music-diary",
-  description: "Платформа-блог для музыкальных дневников",
+  /*
+    Без metadataBase относительный путь к картинке в openGraph так и остаётся
+    относительным, а мессенджер или соцсеть, которые тянут превью со стороны,
+    развернуть его не могут — картинки просто не будет.
+  */
+  metadataBase: new URL(SITE_URL),
+  title: {
+    // Заголовок самой главной страницы и запасной для тех, кто своего
+    // не объявил.
+    default: "music·diary — музыкальный дневник",
+    /*
+      Шаблон дописывает хвост к заголовкам дочерних страниц, поэтому они
+      отдают только свою часть («Имя автора», «12 сентября»). Раньше хвост
+      писали руками в трёх местах — при переименовании сайта их пришлось бы
+      искать по всему дереву.
+    */
+    template: "%s — music·diary",
+  },
+  // Та же строка, что в app/manifest.ts: это описание сайта, а не описание
+  // установленного приложения, и расходиться им не с чего.
+  description:
+    "Личный музыкальный дневник: запись, трек и пара слов о том, что он с тобой сделал.",
   alternates: {
     types: { "application/rss+xml": "/rss.xml" },
   },
+  /*
+    Значения по умолчанию для карточки ссылки. Заголовок и описание Next
+    подставит сюда сам из полей выше, а страница записи переопределит их
+    своими — вместе со своей обложкой.
+  */
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: SITE_LOCALE,
+    url: SITE_URL,
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

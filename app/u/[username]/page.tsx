@@ -32,7 +32,9 @@ export async function generateMetadata({ params }: UserDiaryPageProps): Promise<
   if (!user) return {};
 
   return {
-    title: `${user.name} — music-diary`,
+    // Без хвоста «— music·diary»: его дописывает шаблон в корневом layout.
+    title: user.name,
+    description: user.bio ?? `Музыкальный дневник @${user.username}`,
     alternates: {
       types: { "application/rss+xml": `/u/${username}/rss.xml` },
     },

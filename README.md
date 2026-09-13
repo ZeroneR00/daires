@@ -140,12 +140,13 @@ npx prisma migrate deploy     # or `migrate dev` when changing the schema
 npm run dev                   # http://localhost:3000
 ```
 
-Environment variables (`.env.local`):
+Environment variables — copy `.env.example` to `.env.local` and fill it in:
 
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | Application runtime. Supabase transaction pooler, port 6543, `?pgbouncer=true` |
 | `DIRECT_URL` | Prisma CLI only (migrate / studio). Session pooler, port 5432 — the transaction pooler cannot run migrations |
+| `BETTER_AUTH_SECRET` | Signs session cookies; generate your own |
 | `BETTER_AUTH_URL` | The site's canonical address; locally `http://localhost:3000` |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Avatar storage. Server-side only — the service role key must never reach the browser |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Realtime in the browser. Without them the code is fine and only live delivery sleeps |
